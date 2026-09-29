@@ -6,7 +6,7 @@
 
 **Blocked by:** [01: Application foundation](01-project-foundation.md) — requires its running shell, stack, and test harness.
 
-**Status:** ready-for-agent; start after the blocker is complete.
+**Status:** done
 
 ## Read only these spec sections
 
@@ -21,18 +21,18 @@ Read the named headings only. Reuse ticket 01's installed dependencies, structur
 
 ## Acceptance criteria
 
-- [ ] Implement inline `/register` with required email and password only: email-format validation, password of at least 8 characters, clear accessible errors. No confirmation field, strength meter, or visibility toggle. Never trim or alter the password.
-- [ ] Add MSW: generate `public/mockServiceWorker.js`, handle only `POST /register`, and start the worker before the first render in dev, build, and preview (`onUnhandledRequest: 'bypass'`). The handler re-validates inputs.
-- [ ] Submit through a React Query mutation using `fetch('/register', { method: 'POST' })`. Pending UI prevents duplicate requests. `fail@example.com` deterministically returns HTTP 500 with a safe message; retry works.
-- [ ] Return a mock user and mock token on success; write the demo cookie and update the React Context session. No automatic session expiry. Never persist, log, echo, or include passwords in token claims. The mock does not claim cryptographic authentication.
-- [ ] Initialize the session synchronously from a well-formed cookie before route guards run. Reject corrupt cookies, keep protected content inaccessible when unauthenticated, and handle cookie-write failure without a redirect loop or false persistence claim.
-- [ ] Protect `/account`: redirect (replace) unauthenticated visitors to `/register` with the original location (pathname, search, hash) as router state `from`.
-- [ ] Once authenticated on `/register` (registration success or an existing session), navigate (replace) to `from`; fallback `/` with `/register`'s own query and hash. Show a root-level MUI success toast that survives the navigation.
-- [ ] Show the email-initial avatar and logout for authenticated users. The avatar opens `/account`, which displays the mock user's email/identity without credentials.
-- [ ] Logout removes application-owned session/user/cache state and navigates to clean `/`. Disregard late mutation results so they cannot reauthenticate after logout. Do not clear attribution or anonymous identity; ticket 03 verifies their preservation and ticket 04 adds modal cleanup.
-- [ ] Keep request state in React Query and session state in React Context. Use the shared folder/naming/type standards, labelled inputs, responsive MUI components, safe text rendering, and expected-error recovery.
-- [ ] Extend the Playwright harness for invalid email, too-short password, pending duplicate prevention, `fail@example.com` + retry, success/toast/return-to-origin (e.g. `/account?x=1#h` → register → back to `/account?x=1#h`), session reload, protected access, invalid cookies, and logout. Pass type-check, lint, tests, and build.
-- [ ] Update the README (password rule, failure trigger, no-login note) and commit the ticket.
+- [x] Implement inline `/register` with required email and password only: email-format validation, password of at least 8 characters, clear accessible errors. No confirmation field, strength meter, or visibility toggle. Never trim or alter the password.
+- [x] Add MSW: generate `public/mockServiceWorker.js`, handle only `POST /register`, and start the worker before the first render in dev, build, and preview (`onUnhandledRequest: 'bypass'`). The handler re-validates inputs.
+- [x] Submit through a React Query mutation using `fetch('/register', { method: 'POST' })`. Pending UI prevents duplicate requests. `fail@example.com` deterministically returns HTTP 500 with a safe message; retry works.
+- [x] Return a mock user and mock token on success; write the demo cookie and update the React Context session. No automatic session expiry. Never persist, log, echo, or include passwords in token claims. The mock does not claim cryptographic authentication.
+- [x] Initialize the session synchronously from a well-formed cookie before route guards run. Reject corrupt cookies, keep protected content inaccessible when unauthenticated, and handle cookie-write failure without a redirect loop or false persistence claim.
+- [x] Protect `/account`: redirect (replace) unauthenticated visitors to `/register` with the original location (pathname, search, hash) as router state `from`.
+- [x] Once authenticated on `/register` (registration success or an existing session), navigate (replace) to `from`; fallback `/` with `/register`'s own query and hash. Show a root-level MUI success toast that survives the navigation.
+- [x] Show the email-initial avatar and logout for authenticated users. The avatar opens `/account`, which displays the mock user's email/identity without credentials.
+- [x] Logout removes application-owned session/user/cache state and navigates to clean `/`. Disregard late mutation results so they cannot reauthenticate after logout. Do not clear attribution or anonymous identity; ticket 03 verifies their preservation and ticket 04 adds modal cleanup.
+- [x] Keep request state in React Query and session state in React Context. Use the shared folder/naming/type standards, labelled inputs, responsive MUI components, safe text rendering, and expected-error recovery.
+- [x] Extend the Playwright harness for invalid email, too-short password, pending duplicate prevention, `fail@example.com` + retry, success/toast/return-to-origin (e.g. `/account?x=1#h` → register → back to `/account?x=1#h`), session reload, protected access, invalid cookies, and logout. Pass type-check, lint, tests, and build.
+- [x] Update the README (password rule, failure trigger, no-login note) and commit the ticket.
 
 ## Scope and handoff
 

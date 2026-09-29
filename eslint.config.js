@@ -14,6 +14,7 @@ export default defineConfig(
       'blob-report',
       '.agents',
       '.impeccable',
+      'public/mockServiceWorker.js',
     ],
   },
   {
