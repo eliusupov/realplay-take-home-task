@@ -1,4 +1,10 @@
-import { expect, test, type Page, type Request } from '@playwright/test';
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Page,
+  type Request,
+} from '@playwright/test';
 
 test('home route renders the header and the home content', async ({ page }) => {
   await page.goto('/');
@@ -38,6 +44,18 @@ function trackRegisterRequests(page: Page) {
     if (isRegisterPost(request)) requests.push(request);
   });
   return requests;
+}
+
+function base64UrlJson(value: object) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+// Starts a mock session without registering: a well-formed demo token cookie.
+async function signIn(context: BrowserContext, baseURL: string | undefined) {
+  const token = `${base64UrlJson({ alg: 'none' })}.${base64UrlJson({ sub: 'u1', email: 'ada@example.com' })}.`;
+  await context.addCookies([
+    { name: SESSION_COOKIE, value: token, url: baseURL },
+  ]);
 }
 
 test('an invalid email is explained and nothing is sent', async ({ page }) => {
@@ -125,10 +143,14 @@ test('without a stored origin, registration returns home keeping its own query a
   page,
 }) => {
   await page.goto('/register?promo=X#top');
+  await expect(page.getByRole('dialog')).toBeHidden(); // Signed out: no modal.
 
   await submitRegistration(page, 'ada@example.com', 'correct horse');
 
   await expect(page).toHaveURL('/?promo=X#top');
+  await expect(page.getByRole('dialog', { name: 'Promo code' })).toContainText(
+    'X',
+  );
 });
 
 test('the session survives a reload and an existing session skips registration', async ({
@@ -332,10 +354,6 @@ test('registration clears attribution, and logout keeps the anonymous visitor id
   expect(second.anonymousVisitorId).toBe(first.anonymousVisitorId);
 });
 
-function base64UrlJson(value: object) {
-  return Buffer.from(JSON.stringify(value)).toString('base64url');
-}
-
 test('logout keeps pending attribution, and later capture follows first touch', async ({
   page,
   context,
@@ -343,10 +361,7 @@ test('logout keeps pending attribution, and later capture follows first touch', 
 }) => {
   await visitAt(page, CAMPAIGN_START, '/?utm_source=google');
   // A session that did not come from registering here, so attribution is still pending.
-  const token = `${base64UrlJson({ alg: 'none' })}.${base64UrlJson({ sub: 'u1', email: 'ada@example.com' })}.`;
-  await context.addCookies([
-    { name: SESSION_COOKIE, value: token, url: baseURL },
-  ]);
+  await signIn(context, baseURL);
   await visitAt(page, daysAfterStart(1), '/account');
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL('/');
@@ -431,4 +446,199 @@ test('when site storage is blocked entirely, the app still renders with the noti
   await expect(page.getByRole('main')).toContainText(
     'kept only until you reload',
   );
+});
+
+// URL modals. Entries open only from the query and show one at a time in link order.
+test('a modal link survives registration: attribution is sent, then modals open in link order', async ({
+  page,
+}) => {
+  await page.goto('/account?utm_source=x&promo=SPRING&welcome=1#h');
+  await expect(page).toHaveURL('/register');
+  await expect(page.getByRole('dialog')).toBeHidden();
+
+  const body = await registerAndReadBody(page);
+
+  expect(body.attribution).toMatchObject({ params: { utm_source: 'x' } });
+  await expect(page).toHaveURL(
+    '/account?utm_source=x&promo=SPRING&welcome=1#h',
+  );
+  const promo = page.getByRole('dialog', { name: 'Promo code' });
+  await expect(promo).toContainText('SPRING');
+  await promo.getByRole('button', { name: 'Close' }).click();
+  await expect(page).toHaveURL('/account?utm_source=x&welcome=1#h');
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL('/account?utm_source=x#h');
+  await expect(page.getByRole('dialog')).toBeHidden();
+});
+
+test('modals follow link order, and closing one removes only its key', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await signIn(context, baseURL);
+  await page.goto(
+    '/?other=1&welcome=1&utm_medium=m&invite=friend%207&promo=SPRING24#top',
+  );
+
+  // Opening leaves the URL as it is.
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+  await expect(page).toHaveURL(
+    '/?other=1&welcome=1&utm_medium=m&invite=friend%207&promo=SPRING24#top',
+  );
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  await expect(page).toHaveURL(
+    '/?other=1&utm_medium=m&invite=friend+7&promo=SPRING24#top',
+  );
+  await expect(page.getByRole('dialog', { name: 'Invitation' })).toContainText(
+    'friend 7',
+  );
+  await page.mouse.click(5, 5); // The backdrop.
+
+  await expect(page).toHaveURL('/?other=1&utm_medium=m&promo=SPRING24#top');
+  await expect(page.getByRole('dialog', { name: 'Promo code' })).toContainText(
+    'SPRING24',
+  );
+  await page.keyboard.press('Escape');
+
+  await expect(page).toHaveURL('/?other=1&utm_medium=m#top');
+  await expect(page.getByRole('dialog')).toBeHidden();
+});
+
+test('a repeated key opens one modal with its first value, and closing removes every occurrence', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await signIn(context, baseURL);
+  await page.goto('/?promo=FIRSTVAL&welcome=1&promo=SECONDVAL');
+
+  const promo = page.getByRole('dialog', { name: 'Promo code' });
+  await expect(promo).toContainText('FIRSTVAL');
+  await expect(promo).not.toContainText('SECONDVAL');
+  await page.keyboard.press('Escape');
+
+  await expect(page).toHaveURL('/?welcome=1');
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+});
+
+test('invalid modal values are ignored and stay in the URL', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await page.goto('/?welcome=2&promo=&Welcome=1&invite=');
+  await expect(page).toHaveURL('/?welcome=2&promo=&Welcome=1&invite=');
+
+  await signIn(context, baseURL);
+  await page.goto('/?welcome=2&promo=&signup=1&Welcome=1');
+  await expect(
+    page.getByRole('dialog', { name: 'Registration' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await expect(page).toHaveURL('/?welcome=2&promo=&Welcome=1');
+  await expect(page.getByRole('dialog')).toBeHidden();
+});
+
+test('signup=1 shows a placeholder when signed in and redirects to registration when signed out', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const requests = trackRegisterRequests(page);
+  await page.goto('/?signup=1');
+  await expect(page).toHaveURL('/register');
+  await expect(page.getByRole('dialog')).toBeHidden();
+
+  await signIn(context, baseURL);
+  await page.goto('/?signup=1');
+  const registration = page.getByRole('dialog', { name: 'Registration' });
+  await expect(registration).toContainText('placeholder');
+  await expect(registration.getByRole('button')).toHaveText(['Close']);
+  await expect(registration.getByRole('textbox')).toHaveCount(0);
+  expect(requests).toHaveLength(0);
+});
+
+test('refresh, history and in-app navigation follow the current URL', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await signIn(context, baseURL);
+  await page.goto('/?promo=A&welcome=1');
+  await page.reload();
+  await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL('/?welcome=1');
+  await page.reload();
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+
+  // In-app navigation that drops the trigger removes its modal. The dialog
+  // covers the header, so the link is clicked programmatically.
+  await page
+    .getByRole('link', { name: /Account/, includeHidden: true })
+    .dispatchEvent('click');
+  await expect(page).toHaveURL('/account');
+  await expect(page.getByRole('dialog')).toBeHidden();
+
+  await page.goBack();
+  await expect(page).toHaveURL('/?welcome=1');
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL('/account');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await page.getByRole('link', { name: 'Home' }).click();
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('dialog')).toBeHidden();
+});
+
+test('logout closes every modal and nothing reopens after registering again', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await signIn(context, baseURL);
+  await page.goto('/account?promo=A&welcome=1');
+  await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
+
+  await page
+    .getByRole('button', { name: 'Log out', includeHidden: true })
+    .dispatchEvent('click');
+
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await page.getByRole('link', { name: 'Register' }).click();
+  await submitRegistration(page, 'grace@example.com', 'correct horse');
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('link', { name: /Account/ })).toBeVisible();
+  await expect(page.getByRole('dialog')).toBeHidden();
+});
+
+test('modals are labelled by their title and keep keyboard focus through the sequence', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await signIn(context, baseURL);
+  await page.goto('/?welcome=1&invite=F7');
+
+  const welcome = page.getByRole('dialog', { name: 'Welcome' });
+  await expect(welcome).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(welcome.getByRole('button', { name: 'Close' })).toBeFocused();
+  await page.keyboard.press('Tab'); // The focus trap keeps focus inside.
+  await expect(welcome.getByRole('button', { name: 'Close' })).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  const invite = page.getByRole('dialog', { name: 'Invitation' });
+  await expect(invite).toBeFocused();
+  await page.keyboard.press('Escape');
+
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Realplay' })).toBeFocused();
 });

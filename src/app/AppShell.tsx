@@ -20,11 +20,14 @@ import {
   captureAttribution,
   isAttributionPersistent,
 } from '../features/attribution/attribution';
+import { ModalRenderer } from '../features/modals/ModalRenderer';
+import { ModalUrlSync } from '../features/modals/ModalUrlSync';
 import { useSession } from '../features/session/session';
 import { ToastContext, type Toast } from '../shared/toast';
 
 // Root layout for every route: the header and the main content column. It
-// also owns the toast, so a toast shown by a page survives that page unmounting.
+// also owns the toast, so a toast shown by a page survives that page unmounting,
+// and the URL modals (synced from the URL, rendered above every page).
 export function AppShell() {
   const { user, endSession } = useSession();
   const navigate = useNavigate();
@@ -45,6 +48,7 @@ export function AppShell() {
 
   function logOut() {
     // Leave the protected page first, so its guard never sees the signed-out state.
+    // The clean home URL has no modal triggers, so ModalUrlSync closes every entry.
     void navigate('/', { flushSync: true });
     endSession();
     setIsToastOpen(false); // A toast about the ended session is stale.
@@ -122,6 +126,8 @@ export function AppShell() {
           <Outlet />
         </ToastContext.Provider>
       </Container>
+      <ModalUrlSync />
+      <ModalRenderer />
       <Snackbar
         open={isToastOpen}
         autoHideDuration={toast?.severity === 'success' ? 6000 : null}

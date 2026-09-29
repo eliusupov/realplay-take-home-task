@@ -6,7 +6,7 @@
 
 **Blocked by:** [03: First-touch attribution](03-first-touch-attribution.md) — integrates with its completed capture → registration → session/logout flow, including the app and auth delivered by tickets 01–02.
 
-**Status:** ready-for-agent; start after the blocker is complete.
+**Status:** done
 
 ## Read only these spec sections
 
@@ -23,19 +23,19 @@ Read only the linked headings and inspect the existing session/capture/logout in
 
 ## Acceptance criteria
 
-- [ ] A React Context modal-stack provider exposes `openModal({ type, params })` and `closeModal(type)` to descendants. One root MUI renderer; no modal content renders while unauthenticated.
-- [ ] Map Welcome, Promo, Invite, and Registration to the specified query parameters as a discriminated union. Display the promo code or inviter identifier as safe text with clearly demonstrative content, without invented business APIs.
-- [ ] One root URL-sync component is the only in-app caller of `openModal`. On each location change it calls `openModal` for each recognized parameter in URL order and `closeModal` for entries whose parameter disappeared. No launch buttons or other programmatic opening.
-- [ ] `openModal` is idempotent per type (updates params, never duplicates), so re-renders and StrictMode double effects are harmless. Opening never changes the URL.
-- [ ] `closeModal(type)` removes the entry and deletes only that key (all occurrences) from the URL with route replacement, preserving other modal/attribution/unrelated keys and the hash. The next entry shows immediately.
-- [ ] Render only the first entry: one Dialog, one backdrop, one focus trap. Close control, Escape, and backdrop click all close. Verify labels and focus restoration through the sequence.
-- [ ] `signup=1` is handled exactly like the other triggers, with no special cases. Authenticated: a modal titled "Registration" with a short neutral placeholder line and Close only — no account creation, no claims about its purpose. Unauthenticated: redirect to `/register` like any trigger.
-- [ ] Every valid unauthenticated modal link captures attribution before redirect, redirects to `/register` with `from`, and after registration returns to the original location where its modals open. No redirect loops or duplicate registration logic.
-- [ ] Cold load, refresh, back/forward, and in-app navigation (e.g. `/` ↔ `/account`) follow the current URL; changed or removed triggers update or remove their entries.
-- [ ] Logout clears all entries and uses the existing clean-home navigation, so nothing reopens. Preserve ticket 03's attribution and UUID behavior.
-- [ ] Keep typed modal variants and sync rules within the modal feature. Reuse existing auth, attribution, routing, and logout behavior; no competing stores or effects.
-- [ ] Extend the Playwright harness for link → attribution → registration → return → modal, URL order, parameter/hash preservation, history/refresh, in-app navigation, provider API via context, authenticated-only rendering, `signup=1` placeholder, focus, and logout. Run the combined checks, type-check, lint, and production build.
-- [ ] Commit the ticket.
+- [x] A React Context modal-stack provider exposes `openModal({ type, params })` and `closeModal(type)` to descendants. One root MUI renderer; no modal content renders while unauthenticated.
+- [x] Map Welcome, Promo, Invite, and Registration to the specified query parameters as a discriminated union. Display the promo code or inviter identifier as safe text with clearly demonstrative content, without invented business APIs.
+- [x] One root URL-sync component is the only in-app caller of `openModal`. On each location change it calls `openModal` for each recognized parameter in URL order and `closeModal` for entries whose parameter disappeared. No launch buttons or other programmatic opening.
+- [x] `openModal` is idempotent per type (updates params, never duplicates), so re-renders and StrictMode double effects are harmless. Opening never changes the URL.
+- [x] `closeModal(type)` removes the entry and deletes only that key (all occurrences) from the URL with route replacement, preserving other modal/attribution/unrelated keys and the hash. The next entry shows immediately.
+- [x] Render only the first entry: one Dialog, one backdrop, one focus trap. Close control, Escape, and backdrop click all close. Verify labels and focus restoration through the sequence.
+- [x] `signup=1` is handled exactly like the other triggers, with no special cases. Authenticated: a modal titled "Registration" with a short neutral placeholder line and Close only — no account creation, no claims about its purpose. Unauthenticated: redirect to `/register` like any trigger.
+- [x] Every valid unauthenticated modal link captures attribution before redirect, redirects to `/register` with `from`, and after registration returns to the original location where its modals open. No redirect loops or duplicate registration logic.
+- [x] Cold load, refresh, back/forward, and in-app navigation (e.g. `/` ↔ `/account`) follow the current URL; changed or removed triggers update or remove their entries.
+- [x] Logout clears all entries and uses the existing clean-home navigation, so nothing reopens. Preserve ticket 03's attribution and UUID behavior.
+- [x] Keep typed modal variants and sync rules within the modal feature. Reuse existing auth, attribution, routing, and logout behavior; no competing stores or effects.
+- [x] Extend the Playwright harness for link → attribution → registration → return → modal, URL order, parameter/hash preservation, history/refresh, in-app navigation, provider API via context, authenticated-only rendering, `signup=1` placeholder, focus, and logout. Run the combined checks, type-check, lint, and production build.
+- [x] Commit the ticket.
 
 ## Completion and scope
 

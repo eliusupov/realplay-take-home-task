@@ -2,7 +2,7 @@
 
 A small React demo that captures first-touch marketing attribution, preserves it through registration and redirects, and opens URL-triggered modals. The backend and accounts are mocked.
 
-Current state: foundation (ticket 01), mock registration and session (ticket 02), and first-touch attribution (ticket 03). URL modals arrive in a later ticket.
+Everything the task asks for is in place: first-touch attribution, mock registration and session with return to the requested page, and URL-triggered modals.
 
 ## Requirements
 
@@ -23,9 +23,11 @@ npm run build       # type-check, then production build into dist/
 npm run preview     # serve dist/ on http://localhost:4173
 ```
 
+Full verification: `npm run typecheck && npm run lint && npm test && npm run build`.
+
 ## Stack
 
-React 18, TypeScript (strict), Vite, MUI (Emotion), React Router, React Query, MSW 2 (mock API). No global state library: React Query owns request state and React Context owns the session (modal state arrives in a later ticket). React Compiler runs on React 18 (`babel-plugin-react-compiler` with `target: '18'` and `react-compiler-runtime`), so components carry no manual `useMemo`/`useCallback`/`memo`; `eslint-plugin-react-hooks` enforces the compiler rules.
+React 18, TypeScript (strict), Vite, MUI (Emotion), React Router, React Query, MSW 2 (mock API). No global state library: React Query owns request state and React Context owns the session and the modal stack. React Compiler runs on React 18 (`babel-plugin-react-compiler` with `target: '18'` and `react-compiler-runtime`), so components carry no manual `useMemo`/`useCallback`/`memo`; `eslint-plugin-react-hooks` enforces the compiler rules.
 
 ## Registration and session (mock)
 
@@ -36,7 +38,7 @@ React 18, TypeScript (strict), Vite, MUI (Emotion), React Router, React Query, M
 - On success the mock returns a user (`id`, `email`) and an unsigned, JWT-shaped demo token (`alg: "none"`, no signature, no password). The app stores the token in the `realplay_session` cookie (Path `/`, SameSite Lax, Secure on HTTPS, no expiry: it lasts for the browser session) and keeps the user in React Context. The password is never stored, logged, or put in the token.
 - A protected page visited without a session redirects to `/register`, remembering the requested location (path, query, hash). After registering, or when `/register` is opened with a session already present, the app returns there. Without a remembered location it goes to `/` with `/register`'s own query and hash. A success toast survives the redirect.
 - Reload keeps the session (the cookie is read synchronously before any route renders). A malformed cookie is ignored. If the cookie cannot be written, the app still signs you in for this page view and says that a reload will sign you out.
-- The header shows an avatar with the email's first letter (links to `/account`) and Log out. Log out deletes the cookie, clears the session and the React Query cache, and returns to a clean `/`.
+- The header shows an avatar with the email's first letter (links to `/account`) and Log out. Log out deletes the cookie, clears the session, the React Query cache and every open modal, and returns to a clean `/` (no query, no hash), so nothing reopens. Attribution and the anonymous visitor id stay.
 - There is no login: after logging out you can only register a new mock account.
 - Security limits: the cookie is written by JavaScript, so it cannot be HttpOnly, and the token is decoded in the browser without verification. This is demonstration behavior; a real backend would validate the session and set an HttpOnly cookie. Production traffic would use HTTPS.
 
@@ -58,8 +60,30 @@ React 18, TypeScript (strict), Vite, MUI (Emotion), React Router, React Query, M
 Example links (dev server):
 
 - Campaign landing on a protected page, captured before the redirect: <http://localhost:5173/account?utm_source=google&utm_medium=cpc&utm_campaign=spring&gclid=Cj0KCQ>
-- Referral plus ignored parameters: <http://localhost:5173/?ref=partner42&fbclid=IwAR0abc&welcome=1&promo=SPRING>
+- Referral plus modal parameters (not captured as attribution; signed out, they lead to registration first): <http://localhost:5173/?ref=partner42&fbclid=IwAR0abc&welcome=1&promo=SPRING>
 - A later campaign that does not replace a fresh record: <http://localhost:5173/?utm_source=instagram&utm_medium=social>
+
+## URL modals
+
+| Query parameter     | Modal        | Content                                                                          |
+| ------------------- | ------------ | -------------------------------------------------------------------------------- |
+| `welcome=1`         | Welcome      | A short greeting.                                                                |
+| `promo=<code>`      | Promo code   | The code from the link, labelled as demo content: no promotion is applied.       |
+| `invite=<friendId>` | Invitation   | The inviter id from the link and a generic line; nothing is looked up or joined. |
+| `signup=1`          | Registration | A neutral placeholder (see the open question below).                             |
+
+- Modals open only from these parameters, on any page, on cold load, refresh, back/forward, and in-app navigation. There are no launch buttons. `welcome` and `signup` count only with the value `1`; `promo` and `invite` need a nonempty value. Keys are case-sensitive; anything else (`welcome=2`, `promo=`, `Welcome=1`) is ignored and left in the URL. Values are shown as plain text (never HTML) and long values wrap.
+- Link order decides the sequence: modals show one at a time in the order their parameters appear, and campaign or unrelated parameters do not affect it. A repeated key counts once, at its first occurrence and with its first value.
+- Closing (Close, Escape, or a backdrop click) removes only that modal's key from the URL (every occurrence of it), with route replacement, keeping every other parameter and the hash. The next modal shows immediately. Opening a modal never changes the URL.
+- Modals render only for a signed-in visitor. A signed-out visitor opening a modal link on any page other than `/register` is sent to `/register` (attribution is captured first), and after registering returns to the original URL, where the modals open. `/register?promo=X` itself does not redirect and, after registering, continues to `/?promo=X`.
+- The URL is the only source of modal intent: a React Context provider (`src/features/modals`) exposes `openModal({ type, params })` and `closeModal(type)`, and one root sync component is the only caller of `openModal`, following every location change. One root renderer shows the first entry only (one dialog, one backdrop, one focus trap). The stack is not persisted; it is rebuilt from the URL.
+- Open question: The task maps `signup=1` to a Registration modal but shows modals only to authenticated users; its purpose is not specified, so it is a placeholder handled like the other modals. Would confirm with the team. It creates no account and makes no claims; a signed-out visitor is redirected to register like any other modal link, and returns to the same URL, so the placeholder then shows.
+
+Example links (dev server; any email and an 8+ character password register a mock account):
+
+- Promo then Welcome, with attribution, on a protected page: <http://localhost:5173/account?utm_source=newsletter&utm_campaign=spring&promo=SPRING&welcome=1#top>
+- All four in link order, with a referral and an unrelated parameter: <http://localhost:5173/?ref=partner42&welcome=1&invite=friend_8f3a2c&lang=en&promo=SPRING&signup=1>
+- Repeated and ignored keys: <http://localhost:5173/?promo=FIRST&gclid=Cj0KCQ&promo=SECOND&welcome=2&invite=friend_1>
 
 ## Folder structure
 
@@ -72,6 +96,7 @@ src/
     attribution/  first-touch capture, 30-day expiry, registration snapshot and cleanup, anonymous visitor id
     registration/ request contract, shared validation rules, registration form (React Query mutation)
     session/      session cookie and token decoding, SessionProvider (React Context), RequireSession guard
+    modals/       modal types and URL parsing, ModalProvider (React Context), URL sync, redirect guard, root renderer
   mocks/          MSW worker and the POST /register handler
   shared/         toast context: the shell renders the root toast, pages show it
 tests/
@@ -82,11 +107,11 @@ tsconfig.node.json  Node code: tests and config files
 
 ## Dependency direction
 
-`app` composes `pages` and `features` (the shell triggers attribution capture); `pages` compose `features`; `registration` uses `session`'s public types and `attribution`'s snapshot and cleanup; `mocks` reuses the registration and attribution checks; `shared` imports no app, page, or feature code. No circular imports and no reaching into another feature's internals.
+`app` composes `pages` and `features` (the shell triggers attribution capture and hosts the modal sync and renderer); `pages` compose `features`; `registration` uses `session`'s public types and `attribution`'s snapshot and cleanup; `modals` uses `session`'s user and its redirect to `/register`; `mocks` reuses the registration and attribution checks; `shared` imports no app, page, or feature code. No circular imports and no reaching into another feature's internals.
 
 ## Testing
 
-One boundary: Playwright (`tests/app.spec.ts`) drives the real app in a real Chromium, with the real router, history, cookies, and localStorage. The config starts `npm run dev` (or reuses a server already on port 5173), so tests run against the same app reviewers use, including the MSW worker. Covered so far: validation errors, duplicate-submit prevention, `fail@example.com` and retry, return to the requested page with a toast, session reload, protected access, malformed cookies, a blocked cookie write, and logout. Attribution tests pin time with Playwright's clock API (`setFixedTime`, which fakes the date but keeps timers running) and cover capture before the redirect, the request payload, retention within 30 days, the exact expiry boundary (29d 23h 59m kept, 30d expired), replacement after expiry, `attribution: null` after an untagged expired visit, an untagged first visit, retry after a failure, cleanup on success, logout keeping the record and the id, no capture while signed in, corrupt records, and failing storage.
+One boundary: Playwright (`tests/app.spec.ts`) drives the real app in a real Chromium, with the real router, history, cookies, and localStorage. The config starts `npm run dev` (or reuses a server already on port 5173), so tests run against the same app reviewers use, including the MSW worker. Covered so far: validation errors, duplicate-submit prevention, `fail@example.com` and retry, return to the requested page with a toast, session reload, protected access, malformed cookies, a blocked cookie write, and logout. Attribution tests pin time with Playwright's clock API (`setFixedTime`, which fakes the date but keeps timers running) and cover capture before the redirect, the request payload, retention within 30 days, the exact expiry boundary (29d 23h 59m kept, 30d expired), replacement after expiry, `attribution: null` after an untagged expired visit, an untagged first visit, retry after a failure, cleanup on success, logout keeping the record and the id, no capture while signed in, corrupt records, and failing storage. Modal tests cover a modal link through attribution, registration and return, a direct `/register?promo=` link that shows nothing until registration, link order, closing by button, Escape and backdrop with only its key removed (other parameters and the hash kept), repeated and invalid keys, refresh, back/forward and in-app navigation, `signup=1` signed in and signed out, logout, and dialog labels and keyboard focus. The context API (`openModal`/`closeModal`) is covered through the URL sync and renderer, not by calling provider internals.
 
 ## Design
 

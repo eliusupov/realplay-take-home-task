@@ -2,6 +2,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { ModalProvider } from '../features/modals/ModalProvider';
+import { RequireSessionForModals } from '../features/modals/RequireSessionForModals';
 import { RequireSession } from '../features/session/RequireSession';
 import { SessionProvider } from '../features/session/SessionProvider';
 import { AccountPage } from '../pages/AccountPage';
@@ -14,13 +16,24 @@ const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
   {
-    element: <AppShell />,
+    // The modal provider needs the router (closing a modal edits the URL);
+    // the shell renders the modal sync and renderer, so it sits inside the provider.
+    element: (
+      <ModalProvider>
+        <AppShell />
+      </ModalProvider>
+    ),
     children: [
-      { index: true, element: <HomePage /> },
       { path: 'register', element: <RegisterPage /> },
       {
-        element: <RequireSession />,
-        children: [{ path: 'account', element: <AccountPage /> }],
+        element: <RequireSessionForModals />,
+        children: [
+          { index: true, element: <HomePage /> },
+          {
+            element: <RequireSession />,
+            children: [{ path: 'account', element: <AccountPage /> }],
+          },
+        ],
       },
     ],
   },
