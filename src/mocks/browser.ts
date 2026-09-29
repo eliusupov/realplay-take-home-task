@@ -1,6 +1,10 @@
 import { delay, http, HttpResponse } from 'msw';
 import { setupWorker } from 'msw/browser';
 import {
+  isAnonymousVisitorId,
+  isAttribution,
+} from '../features/attribution/attribution';
+import {
   MIN_PASSWORD_LENGTH,
   validateRegistration,
 } from '../features/registration/registration';
@@ -20,7 +24,7 @@ export const worker = setupWorker(
   http.post('/register', async ({ request }) => {
     await delay(500); // Fixed latency, so the pending state is visible.
     const body: unknown = await request.json().catch(() => null);
-    const { email, password } = (
+    const { email, password, anonymousVisitorId, attribution } = (
       typeof body === 'object' && body !== null ? body : {}
     ) as Record<string, unknown>;
     // Re-check the form's rules: the client is not a trust boundary.
@@ -33,6 +37,15 @@ export const worker = setupWorker(
         {
           message: `Enter a valid email and a password of at least ${String(MIN_PASSWORD_LENGTH)} characters.`,
         },
+        { status: 400 },
+      );
+    }
+    if (
+      !isAnonymousVisitorId(anonymousVisitorId) ||
+      (attribution !== null && !isAttribution(attribution))
+    ) {
+      return HttpResponse.json(
+        { message: 'The sign-up request was not valid. Please try again.' },
         { status: 400 },
       );
     }

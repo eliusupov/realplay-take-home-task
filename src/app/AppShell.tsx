@@ -8,13 +8,18 @@ import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import Snackbar from '@mui/material/Snackbar';
 import Toolbar from '@mui/material/Toolbar';
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import {
   Link as RouterLink,
   NavLink,
   Outlet,
+  useLocation,
   useNavigate,
 } from 'react-router-dom';
+import {
+  captureAttribution,
+  isAttributionPersistent,
+} from '../features/attribution/attribution';
 import { useSession } from '../features/session/session';
 import { ToastContext, type Toast } from '../shared/toast';
 
@@ -23,8 +28,15 @@ import { ToastContext, type Toast } from '../shared/toast';
 export function AppShell() {
   const { user, endSession } = useSession();
   const navigate = useNavigate();
+  const { search } = useLocation();
   const [toast, setToast] = useState<Toast | null>(null);
   const [isToastOpen, setIsToastOpen] = useState(false);
+
+  // Capture on entry and on every query change. A layout effect runs during the
+  // commit, before the route guard's redirect effect can drop the query.
+  useLayoutEffect(() => {
+    if (!user) captureAttribution(search);
+  }, [user, search]);
 
   function showToast(nextToast: Toast) {
     setToast(nextToast);
@@ -100,6 +112,12 @@ export function AppShell() {
         </Container>
       </AppBar>
       <Container component="main" maxWidth="md" sx={{ py: { xs: 4, sm: 6 } }}>
+        {!isAttributionPersistent && (
+          <Alert severity="warning" role="status" sx={{ mb: 3 }}>
+            This browser is not saving site data, so campaign details from this
+            visit are kept only until you reload or leave the page.
+          </Alert>
+        )}
         <ToastContext.Provider value={showToast}>
           <Outlet />
         </ToastContext.Provider>

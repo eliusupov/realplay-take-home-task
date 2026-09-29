@@ -1,8 +1,19 @@
+import {
+  clearAttribution,
+  snapshotRegistrationAttribution,
+  type Attribution,
+} from '../attribution/attribution';
 import type { RegisteredUser } from '../session/session';
 
 export interface RegisterRequest {
   email: string;
   password: string;
+}
+
+// The wire body: the form fields plus a fresh-record snapshot for this request.
+interface RegisterRequestBody extends RegisterRequest {
+  anonymousVisitorId: string;
+  attribution: Attribution | null;
 }
 
 export interface RegisterResponse {
@@ -45,12 +56,16 @@ function isRegisterResponse(value: unknown): value is RegisterResponse {
 export async function registerUser(
   request: RegisterRequest,
 ): Promise<RegisterResponse> {
+  const requestBody: RegisterRequestBody = {
+    ...request,
+    ...snapshotRegistrationAttribution(),
+  };
   let response: Response;
   try {
     response = await fetch('/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
+      body: JSON.stringify(requestBody),
     });
   } catch {
     throw new Error(
@@ -70,5 +85,7 @@ export async function registerUser(
     throw new Error(
       'The server sent an unexpected response. Please try again.',
     );
+  // Submitted: the attribution is spent. Failures above keep it for a retry.
+  clearAttribution();
   return body;
 }
