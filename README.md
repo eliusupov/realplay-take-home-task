@@ -17,7 +17,8 @@ npm run dev   # http://localhost:5173
 - `npm run preview`: serve the production build on http://localhost:4173
 - `npm run typecheck`: strict TypeScript, no emit
 - `npm run lint`: ESLint
-- `npm test`: Playwright (first run: `npx playwright install chromium`)
+- `npm test`: unit/component tests with Vitest
+- `npm run test:e2e`: Playwright end-to-end (first run: `npx playwright install chromium`)
 
 ## Try it
 

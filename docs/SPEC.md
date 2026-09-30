@@ -119,6 +119,7 @@ These standards apply to every implementation ticket. They reflect the user's re
 - Centralize actual shared constants and repeated rules, particularly storage keys, cookie attributes, and the attribution duration. Do not create configuration for values that have no genuine variation.
 - Clean up listeners, subscriptions, timers, and asynchronous work. Handle repeated React development execution, route changes, logout, and late request completion safely.
 - Use MUI/native accessibility features, semantic elements, associated labels/errors, keyboard operation, and responsive layouts. Do not replace accessible controls with click-only containers.
+- Unit/component tests live in a `__tests__` folder next to the code (Vitest + React Testing Library, MSW node server); real-browser flows live in `e2e/` (Playwright).
 - Configure consistent linting and formatting, reproducible dependency installation, and scripts for development, type checking, linting, tests, production build, and preview. Keep the toolchain small and compatible with React 18.
 - Test externally visible behavior at a focused application boundary. Share one harness, control time in tests, and avoid tests coupled to provider internals or component implementation details.
 - Keep secrets and credentials out of source, persisted client state, diagnostics, and logs. Document mock security limitations and every deliberate product assumption.
@@ -288,11 +289,10 @@ These standards apply to every implementation ticket. They reflect the user's re
 
 ### Proposed testing boundary
 
-- One high-level boundary: Playwright driving the real app in a real browser (real history, cookies, localStorage, and the MSW worker). Ticket 01 creates the harness (`tests/app.spec.ts`).
-- Exercise the real router, modal provider, root renderer, form, attribution flow, and session restoration together. Avoid tests coupled to provider internals.
-- Control time with Playwright's clock API to cover the 30-day rule; no time-travel controls in the product UI.
-- Inspect the outbound `POST /register` (e.g. `page.waitForRequest`). Assert its attribution and identity fields without logging credentials.
-- Leave the smallest runnable set of meaningful behavior checks. No per-function suite or tests that restate implementation details.
+- Unit/component tests (Vitest + React Testing Library, jsdom) in a `__tests__` folder next to the code they cover. Render through the real providers and router (`src/test/renderWithProviders.tsx`); the MSW node server serves the same handlers as the browser worker.
+- End-to-end tests (Playwright) in `e2e/`, split by area, drive the real app in a real browser (real history, cookies, localStorage, and the MSW worker). Control time with Playwright's clock API for the 30-day rule; no time-travel controls in the product UI.
+- Test behavior through public interfaces (roles, labels, URLs, the outbound `POST /register` body), not provider internals. Assert attribution and identity fields without logging credentials.
+- A few focused, meaningful checks per file. No tests that restate implementation details.
 
 ### Behaviors to verify
 

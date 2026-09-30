@@ -33,7 +33,7 @@ export default defineConfig(
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['tests/**/*.ts', '*.config.ts'],
+    files: ['e2e/**/*.ts', '*.config.ts'],
     languageOptions: { globals: globals.node },
   },
 );
