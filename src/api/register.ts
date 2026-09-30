@@ -1,42 +1,12 @@
+import type { Attribution, RegisterRequest, RegisterResponse } from '../types';
 import {
   clearAttribution,
   snapshotRegistrationAttribution,
-  type Attribution,
-} from '../attribution/attribution';
-import type { RegisteredUser } from '../session/session';
+} from '../utils/attribution';
 
-export interface RegisterRequest {
-  email: string;
-  password: string;
-}
-
-// The wire body: the form fields plus a fresh-record snapshot for this request.
 interface RegisterRequestBody extends RegisterRequest {
   anonymousVisitorId: string;
   attribution: Attribution | null;
-}
-
-export interface RegisterResponse {
-  user: RegisteredUser;
-  token: string;
-}
-
-export const MIN_PASSWORD_LENGTH = 8;
-
-export type RegistrationErrors = Partial<Record<keyof RegisterRequest, string>>;
-
-// Format only, not ownership. The form and the mock server share this rule.
-export function validateRegistration({
-  email,
-  password,
-}: RegisterRequest): RegistrationErrors {
-  const errors: RegistrationErrors = {};
-  if (!email) errors.email = 'Enter your email address.';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    errors.email = 'Enter an email address like name@example.com.';
-  if (password.length < MIN_PASSWORD_LENGTH)
-    errors.password = `Use at least ${String(MIN_PASSWORD_LENGTH)} characters.`;
-  return errors;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -85,7 +55,6 @@ export async function registerUser(
     throw new Error(
       'The server sent an unexpected response. Please try again.',
     );
-  // Submitted: the attribution is spent. Failures above keep it for a retry.
   clearAttribution();
   return body;
 }

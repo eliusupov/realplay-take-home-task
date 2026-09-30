@@ -1,21 +1,20 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useSession } from './session';
+import { useSession } from '../hooks/useSession';
+import { paths } from './paths';
 
-// Replaces the current location with /register, carrying it as router state
-// `from` so registration can return to it.
 export function RedirectToRegister() {
   const { pathname, search, hash } = useLocation();
   return (
     <Navigate
-      to="/register"
+      to={paths.register}
       replace
       state={{ from: { pathname, search, hash } }}
     />
   );
 }
 
-// Layout route for protected pages.
 export function RequireSession() {
   const { user } = useSession();
-  return user ? <Outlet /> : <RedirectToRegister />;
+  if (!user) return <RedirectToRegister />;
+  return <Outlet />;
 }

@@ -1,12 +1,4 @@
-// First-touch campaign attribution and the anonymous visitor id. The capture,
-// expiry, snapshot and cleanup rules live here; the rest of the app uses only
-// the exports below.
-
-export interface Attribution {
-  params: Record<string, string>;
-  /** ISO 8601 time of the tagged visit that started the window. */
-  capturedAt: string;
-}
+import type { Attribution } from '../types';
 
 const ATTRIBUTION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -17,20 +9,18 @@ const TRACKED_KEYS = new Set(['ref', 'gclid', 'fbclid']);
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Blocked site storage throws on access or write. Then the values live in this
-// page's memory instead, and are lost on reload.
-const memory = new Map<string, string>();
+const valuesLostOnReload = new Map<string, string>();
 const memoryStorage = {
-  getItem: (key: string) => memory.get(key) ?? null,
+  getItem: (key: string) => valuesLostOnReload.get(key) ?? null,
   setItem: (key: string, value: string) => {
-    memory.set(key, value);
+    valuesLostOnReload.set(key, value);
   },
   removeItem: (key: string) => {
-    memory.delete(key);
+    valuesLostOnReload.delete(key);
   },
 };
 
-function openStorage() {
+function openLocalStorageOrMemoryWhenBlocked() {
   try {
     localStorage.setItem(STORAGE_PROBE_KEY, '1');
     localStorage.removeItem(STORAGE_PROBE_KEY);
@@ -40,10 +30,7 @@ function openStorage() {
   }
 }
 
-// Probed once per page. A quota error after a passing probe is not handled
-// (these records are a few hundred bytes). A failing probe on readable but full
-// storage also switches to memory, so values stored earlier are not read.
-const storage = openStorage();
+const storage = openLocalStorageOrMemoryWhenBlocked();
 
 export const isAttributionPersistent = storage !== memoryStorage;
 
@@ -55,7 +42,6 @@ export function isAnonymousVisitorId(value: unknown): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value);
 }
 
-// Stored and submitted records are untrusted until they pass this check.
 export function isAttribution(value: unknown): value is Attribution {
   if (typeof value !== 'object' || value === null) return false;
   const { params, capturedAt } = value as Record<string, unknown>;
@@ -75,8 +61,6 @@ export function isAttribution(value: unknown): value is Attribution {
   );
 }
 
-// A missing, corrupt, future-dated or expired (age >= 30 days) record counts
-// as absent.
 function readFreshAttribution(): Attribution | null {
   const stored = storage.getItem(ATTRIBUTION_KEY);
   if (!stored) return null;
@@ -91,7 +75,6 @@ function readFreshAttribution(): Attribution | null {
   return ageMs >= 0 && ageMs < ATTRIBUTION_DURATION_MS ? value : null;
 }
 
-// Created once per browser profile and never cleared by this app.
 function ensureAnonymousVisitorId() {
   const stored = storage.getItem(ANONYMOUS_VISITOR_ID_KEY);
   if (isAnonymousVisitorId(stored)) return stored;
@@ -100,14 +83,8 @@ function ensureAnonymousVisitorId() {
   return anonymousVisitorId;
 }
 
-/**
- * Applies the first-touch rule to a visit's query string. Call it only while
- * unauthenticated, before any redirect drops the query. A fresh record is
- * never changed; without one, a visit with tracked parameters starts a new
- * record and a visit without them stores nothing.
- */
 export function captureAttribution(search: string) {
-  ensureAnonymousVisitorId(); // The journey identity starts on the first visit.
+  ensureAnonymousVisitorId();
   if (readFreshAttribution()) return;
   const params: Record<string, string> = {};
   for (const [key, value] of new URLSearchParams(search)) {
@@ -122,7 +99,6 @@ export function captureAttribution(search: string) {
   storage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution));
 }
 
-/** Snapshot for one registration request. */
 export function snapshotRegistrationAttribution() {
   return {
     anonymousVisitorId: ensureAnonymousVisitorId(),
@@ -130,7 +106,6 @@ export function snapshotRegistrationAttribution() {
   };
 }
 
-/** After a successful registration. The anonymous visitor id stays. */
 export function clearAttribution() {
   storage.removeItem(ATTRIBUTION_KEY);
 }

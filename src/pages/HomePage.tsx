@@ -1,10 +1,26 @@
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router-dom';
-import { useSession } from '../features/session/session';
+import { useSession } from '../hooks/useSession';
+import { paths } from '../routes/paths';
 
 export function HomePage() {
   const { user } = useSession();
+
+  const renderRegisterButton = () => {
+    if (user) return null;
+    return (
+      <Button
+        component={RouterLink}
+        to={paths.register}
+        variant="contained"
+        size="large"
+        sx={{ mt: 4 }}
+      >
+        Register
+      </Button>
+    );
+  };
 
   return (
     <>
@@ -16,17 +32,7 @@ export function HomePage() {
         sends them with sign-up, and returns you to the page you started from.
         The backend is a mock, so no real accounts are created.
       </Typography>
-      {!user && (
-        <Button
-          component={RouterLink}
-          to="/register"
-          variant="contained"
-          size="large"
-          sx={{ mt: 4 }}
-        >
-          Register
-        </Button>
-      )}
+      {renderRegisterButton()}
     </>
   );
 }

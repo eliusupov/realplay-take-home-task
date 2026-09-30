@@ -23,6 +23,20 @@ test('home route renders the header and the home content', async ({ page }) => {
   await expect(page.getByRole('main')).toContainText('mock');
 });
 
+test('an unknown URL shows page not found with a working link home', async ({
+  page,
+}) => {
+  await page.goto('/does-not-exist');
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Page not found' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Go to home' }).click();
+
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('banner')).toBeVisible();
+});
+
 const SESSION_COOKIE = 'realplay_session';
 
 async function submitRegistration(page: Page, email: string, password: string) {
@@ -50,8 +64,10 @@ function base64UrlJson(value: object) {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
 }
 
-// Starts a mock session without registering: a well-formed demo token cookie.
-async function signIn(context: BrowserContext, baseURL: string | undefined) {
+async function signInWithDemoTokenCookie(
+  context: BrowserContext,
+  baseURL: string | undefined,
+) {
   const token = `${base64UrlJson({ alg: 'none' })}.${base64UrlJson({ sub: 'u1', email: 'ada@example.com' })}.`;
   await context.addCookies([
     { name: SESSION_COOKIE, value: token, url: baseURL },
@@ -102,15 +118,17 @@ test('fail@example.com shows a server error, and a retry succeeds', async ({
 }) => {
   await page.goto('/register?utm_source=google');
 
-  const failed = await registerAndReadBody(page, 'fail@example.com');
+  const failed = await registerAndReadAttributionFields(
+    page,
+    'fail@example.com',
+  );
   await expect(page.getByRole('alert')).toContainText('Try again');
   await expect(page).toHaveURL('/register?utm_source=google');
   await expect(page.getByRole('link', { name: /Account/ })).toBeHidden();
 
-  const retried = await registerAndReadBody(page);
+  const retried = await registerAndReadAttributionFields(page);
   await expect(page).toHaveURL('/?utm_source=google');
   await expect(page.getByRole('alert')).toContainText('registered');
-  // The failure kept the attribution, so the retry sends the same record.
   expect(failed.attribution).toMatchObject({
     params: { utm_source: 'google' },
   });
@@ -143,7 +161,7 @@ test('without a stored origin, registration returns home keeping its own query a
   page,
 }) => {
   await page.goto('/register?promo=X#top');
-  await expect(page.getByRole('dialog')).toBeHidden(); // Signed out: no modal.
+  await expect(page.getByRole('dialog')).toBeHidden();
 
   await submitRegistration(page, 'ada@example.com', 'correct horse');
 
@@ -204,10 +222,9 @@ test('logout ends the session and returns to a clean home page', async ({
 test('when the session cookie cannot be written, the visitor is told the session ends on reload', async ({
   page,
 }) => {
-  // Simulates a browser that blocks cookies: writes are dropped.
-  await page.addInitScript(
-    "Object.defineProperty(document, 'cookie', { get: () => '', set: () => {} })",
-  );
+  const dropCookieWrites =
+    "Object.defineProperty(document, 'cookie', { get: () => '', set: () => {} })";
+  await page.addInitScript(dropCookieWrites);
   await page.goto('/account');
 
   await submitRegistration(page, 'ada@example.com', 'correct horse');
@@ -220,7 +237,6 @@ test('when the session cookie cannot be written, the visitor is told the session
   await expect(page).toHaveURL('/register');
 });
 
-// Attribution: time is pinned with the clock API so the 30-day window is exact.
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CAMPAIGN_START = new Date('2026-01-01T09:00:00.000Z');
 const UUID_PATTERN =
@@ -231,10 +247,8 @@ function daysAfterStart(days: number) {
 }
 
 async function visitAt(page: Page, time: Date, url: string) {
-  // setFixedTime fakes Date only; timers keep running (the mock API's delay needs them).
   await page.clock.setFixedTime(time);
   await page.goto(url);
-  // goto resolves before the app's first render (it waits for the mock API).
   await expect(page.getByRole('main')).toBeVisible();
 }
 
@@ -243,9 +257,10 @@ interface RegistrationBody {
   attribution: unknown;
 }
 
-// Registers from the current page and returns the attribution fields of the
-// request body (credentials are left out so they never reach test output).
-async function registerAndReadBody(page: Page, email = 'ada@example.com') {
+async function registerAndReadAttributionFields(
+  page: Page,
+  email = 'ada@example.com',
+) {
   const request = page.waitForRequest(isRegisterPost);
   await submitRegistration(page, email, 'correct horse');
   const { anonymousVisitorId, attribution } = (
@@ -264,7 +279,7 @@ test('a campaign link is captured before the auth redirect and sent with registr
   );
   await expect(page).toHaveURL('/register');
 
-  const body = await registerAndReadBody(page);
+  const body = await registerAndReadAttributionFields(page);
 
   expect(body.anonymousVisitorId).toMatch(UUID_PATTERN);
   expect(body.attribution).toEqual({
@@ -286,7 +301,7 @@ test('within 30 days, a later campaign and an untagged revisit keep the first to
   await visitAt(page, daysAfterStart(10), '/?utm_source=instagram&fbclid=f1');
   await visitAt(page, daysAfterStart(20), '/register');
 
-  expect((await registerAndReadBody(page)).attribution).toEqual({
+  expect((await registerAndReadAttributionFields(page)).attribution).toEqual({
     params: { utm_source: 'google', gclid: 'g1' },
     capturedAt: CAMPAIGN_START.toISOString(),
   });
@@ -295,22 +310,20 @@ test('within 30 days, a later campaign and an untagged revisit keep the first to
 test('first touch expires exactly 30 days after capture, and a tagged visit then replaces it', async ({
   page,
 }) => {
-  const lastFreshMoment = new Date(daysAfterStart(30).getTime() - 60_000);
+  const expiryMoment = daysAfterStart(30);
+  const lastFreshMoment = new Date(expiryMoment.getTime() - 60_000);
   await visitAt(page, CAMPAIGN_START, '/?utm_source=google&utm_medium=cpc');
   const anonymousVisitorId = await page.evaluate(() =>
     localStorage.getItem('realplay_anonymous_visitor_id'),
   );
-  // 29d 23h 59m: still fresh, so this campaign is ignored.
   await visitAt(page, lastFreshMoment, '/?utm_source=instagram');
-  // Exactly 30 days: expired, so this campaign replaces the whole record.
-  await visitAt(page, daysAfterStart(30), '/register?utm_source=newsletter');
+  await visitAt(page, expiryMoment, '/register?utm_source=newsletter');
 
-  const body = await registerAndReadBody(page);
+  const body = await registerAndReadAttributionFields(page);
   expect(body.attribution).toEqual({
     params: { utm_source: 'newsletter' },
-    capturedAt: daysAfterStart(30).toISOString(),
+    capturedAt: expiryMoment.toISOString(),
   });
-  // Replacing the record keeps the anonymous visitor id.
   expect(body.anonymousVisitorId).toBe(anonymousVisitorId);
 });
 
@@ -320,7 +333,7 @@ test('an untagged visit after expiry stores nothing and registration sends null'
   await visitAt(page, CAMPAIGN_START, '/?utm_source=google');
   await visitAt(page, daysAfterStart(30), '/register');
 
-  expect((await registerAndReadBody(page)).attribution).toBeNull();
+  expect((await registerAndReadAttributionFields(page)).attribution).toBeNull();
 });
 
 test('an untagged first visit does not block a later campaign', async ({
@@ -329,7 +342,7 @@ test('an untagged first visit does not block a later campaign', async ({
   await visitAt(page, CAMPAIGN_START, '/');
   await visitAt(page, daysAfterStart(1), '/register?utm_campaign=spring');
 
-  expect((await registerAndReadBody(page)).attribution).toEqual({
+  expect((await registerAndReadAttributionFields(page)).attribution).toEqual({
     params: { utm_campaign: 'spring' },
     capturedAt: daysAfterStart(1).toISOString(),
   });
@@ -339,17 +352,19 @@ test('registration clears attribution, and logout keeps the anonymous visitor id
   page,
 }) => {
   await visitAt(page, CAMPAIGN_START, '/register?utm_source=google');
-  const first = await registerAndReadBody(page);
+  const first = await registerAndReadAttributionFields(page);
   expect(first.attribution).not.toBeNull();
   await expect(page.getByRole('alert')).toContainText('registered');
 
-  // Signed in: campaign links are not captured.
   await visitAt(page, daysAfterStart(1), '/?utm_source=instagram');
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL('/');
 
   await visitAt(page, daysAfterStart(1), '/register');
-  const second = await registerAndReadBody(page, 'grace@example.com');
+  const second = await registerAndReadAttributionFields(
+    page,
+    'grace@example.com',
+  );
   expect(second.attribution).toBeNull();
   expect(second.anonymousVisitorId).toBe(first.anonymousVisitorId);
 });
@@ -360,14 +375,13 @@ test('logout keeps pending attribution, and later capture follows first touch', 
   baseURL,
 }) => {
   await visitAt(page, CAMPAIGN_START, '/?utm_source=google');
-  // A session that did not come from registering here, so attribution is still pending.
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await visitAt(page, daysAfterStart(1), '/account');
   await page.getByRole('button', { name: 'Log out' }).click();
   await expect(page).toHaveURL('/');
 
   await visitAt(page, daysAfterStart(2), '/register?utm_source=instagram');
-  expect((await registerAndReadBody(page)).attribution).toEqual({
+  expect((await registerAndReadAttributionFields(page)).attribution).toEqual({
     params: { utm_source: 'google' },
     capturedAt: CAMPAIGN_START.toISOString(),
   });
@@ -406,7 +420,6 @@ test('corrupt stored attribution is treated as absent', async ({ page }) => {
 test('when site storage cannot be written, attribution works for the page session with a notice', async ({
   page,
 }) => {
-  // A full or write-protected storage (e.g. older Safari private mode): writes throw.
   await page.addInitScript(() => {
     Storage.prototype.setItem = () => {
       throw new DOMException('Storage is full', 'QuotaExceededError');
@@ -418,7 +431,7 @@ test('when site storage cannot be written, attribution works for the page sessio
     'kept only until you reload',
   );
 
-  const body = await registerAndReadBody(page);
+  const body = await registerAndReadAttributionFields(page);
 
   expect(body.anonymousVisitorId).toMatch(UUID_PATTERN);
   expect(body.attribution).toEqual({
@@ -431,8 +444,6 @@ test('when site storage cannot be written, attribution works for the page sessio
 test('when site storage is blocked entirely, the app still renders with the notice', async ({
   page,
 }) => {
-  // Chrome with site data blocked: touching localStorage throws. The mock API
-  // cannot start then either, so this checks only that nothing crashes.
   await page.addInitScript(() => {
     Object.defineProperty(globalThis, 'localStorage', {
       get() {
@@ -448,7 +459,6 @@ test('when site storage is blocked entirely, the app still renders with the noti
   );
 });
 
-// URL modals. Entries open only from the query and show one at a time in link order.
 test('a modal link survives registration: attribution is sent, then modals open in link order', async ({
   page,
 }) => {
@@ -456,7 +466,7 @@ test('a modal link survives registration: attribution is sent, then modals open 
   await expect(page).toHaveURL('/register');
   await expect(page.getByRole('dialog')).toBeHidden();
 
-  const body = await registerAndReadBody(page);
+  const body = await registerAndReadAttributionFields(page);
 
   expect(body.attribution).toMatchObject({ params: { utm_source: 'x' } });
   await expect(page).toHaveURL(
@@ -477,12 +487,11 @@ test('modals follow link order, and closing one removes only its key', async ({
   context,
   baseURL,
 }) => {
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await page.goto(
     '/?other=1&welcome=1&utm_medium=m&invite=friend%207&promo=SPRING24#top',
   );
 
-  // Opening leaves the URL as it is.
   await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
   await expect(page).toHaveURL(
     '/?other=1&welcome=1&utm_medium=m&invite=friend%207&promo=SPRING24#top',
@@ -496,7 +505,8 @@ test('modals follow link order, and closing one removes only its key', async ({
   await expect(page.getByRole('dialog', { name: 'Invitation' })).toContainText(
     'friend 7',
   );
-  await page.mouse.click(5, 5); // The backdrop.
+  const backdropCorner = { x: 5, y: 5 };
+  await page.mouse.click(backdropCorner.x, backdropCorner.y);
 
   await expect(page).toHaveURL('/?other=1&utm_medium=m&promo=SPRING24#top');
   await expect(page.getByRole('dialog', { name: 'Promo code' })).toContainText(
@@ -513,7 +523,7 @@ test('a repeated key opens one modal with its first value, and closing removes e
   context,
   baseURL,
 }) => {
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await page.goto('/?promo=FIRSTVAL&welcome=1&promo=SECONDVAL');
 
   const promo = page.getByRole('dialog', { name: 'Promo code' });
@@ -533,7 +543,7 @@ test('invalid modal values are ignored and stay in the URL', async ({
   await page.goto('/?welcome=2&promo=&Welcome=1&invite=');
   await expect(page).toHaveURL('/?welcome=2&promo=&Welcome=1&invite=');
 
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await page.goto('/?welcome=2&promo=&signup=1&Welcome=1');
   await expect(
     page.getByRole('dialog', { name: 'Registration' }),
@@ -554,7 +564,7 @@ test('signup=1 shows a placeholder when signed in and redirects to registration 
   await expect(page).toHaveURL('/register');
   await expect(page.getByRole('dialog')).toBeHidden();
 
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await page.goto('/?signup=1');
   const registration = page.getByRole('dialog', { name: 'Registration' });
   await expect(registration).toContainText('placeholder');
@@ -568,7 +578,7 @@ test('refresh, history and in-app navigation follow the current URL', async ({
   context,
   baseURL,
 }) => {
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await page.goto('/?promo=A&welcome=1');
   await page.reload();
   await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
@@ -577,8 +587,6 @@ test('refresh, history and in-app navigation follow the current URL', async ({
   await page.reload();
   await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
 
-  // In-app navigation that drops the trigger removes its modal. The dialog
-  // covers the header, so the link is clicked programmatically.
   await page
     .getByRole('link', { name: /Account/, includeHidden: true })
     .dispatchEvent('click');
@@ -601,7 +609,7 @@ test('logout closes every modal and nothing reopens after registering again', as
   context,
   baseURL,
 }) => {
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await page.goto('/account?promo=A&welcome=1');
   await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
 
@@ -623,14 +631,14 @@ test('modals are labelled by their title and keep keyboard focus through the seq
   context,
   baseURL,
 }) => {
-  await signIn(context, baseURL);
+  await signInWithDemoTokenCookie(context, baseURL);
   await page.goto('/?welcome=1&invite=F7');
 
   const welcome = page.getByRole('dialog', { name: 'Welcome' });
   await expect(welcome).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(welcome.getByRole('button', { name: 'Close' })).toBeFocused();
-  await page.keyboard.press('Tab'); // The focus trap keeps focus inside.
+  await page.keyboard.press('Tab');
   await expect(welcome.getByRole('button', { name: 'Close' })).toBeFocused();
   await page.keyboard.press('Enter');
 

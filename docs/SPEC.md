@@ -108,10 +108,10 @@ Logout ends the mock session, clears modal and cached user state, and navigates 
 
 These standards apply to every implementation ticket. They reflect the user's request for a clean, production-ready folder structure and clear naming; authentication and business services remain explicitly mocked.
 
-- Organize application composition, route pages, and feature-owned code separately. Group registration/session, attribution, and modal logic by responsibility rather than scattering each feature across generic folders.
-- Create folders and abstractions when they contain real implementation. Avoid empty scaffolding, a mandatory folder for every architectural layer, or interfaces with only one speculative implementation.
-- Keep shared UI and utilities limited to code that is actually reused. Feature-specific logic belongs with its feature.
-- Keep dependency direction clear: route pages compose features; features use small shared primitives; shared primitives do not import feature or page code. Avoid circular imports and cross-feature access to private internals.
+- Use a conventional React layout: `components/`, `pages/`, `routes/` (router config and route guards), `context/`, `hooks/`, `api/`, `utils/`, `mocks/`. Create a folder only when it holds real code; no barrel files or speculative layers.
+- Keep dependency direction clear: pages and components use hooks, context, api, and utils; utils import nothing from React layers. Avoid circular imports.
+- Write self-documenting code with no comments. Replace inline conditional JSX (`&&`, ternaries, inline `.map` blocks) with named render functions called from the JSX.
+- The root route has an `ErrorBoundary` as its `errorElement` for unexpected errors and unknown URLs.
 - Use descriptive domain names such as attribution, capturedAt, anonymousVisitorId, returnLocation, and registeredUser. Name booleans as predicates, actions as verbs, and time values with explicit units.
 - Enable strict TypeScript. Model modal variants and API contracts explicitly. Treat parsed cookies, storage, URL values, and request bodies as untrusted until validated; avoid unchecked casts, non-null assertions, and unexplained any types.
 - Keep components, hooks, and functions focused. Separate rendering from attribution/session rules without creating unnecessary service, repository, factory, or adapter layers.
@@ -122,7 +122,7 @@ These standards apply to every implementation ticket. They reflect the user's re
 - Configure consistent linting and formatting, reproducible dependency installation, and scripts for development, type checking, linting, tests, production build, and preview. Keep the toolchain small and compatible with React 18.
 - Test externally visible behavior at a focused application boundary. Share one harness, control time in tests, and avoid tests coupled to provider internals or component implementation details.
 - Keep secrets and credentials out of source, persisted client state, diagnostics, and logs. Document mock security limitations and every deliberate product assumption.
-- Delivery is a git repository with a `README.md` (setup, commands, decisions, example links). Ticket 01 initializes git; commit each completed ticket separately.
+- Delivery is a git repository with a lean `README.md` (what it is, how to run it, key behavior, example links). Ticket 01 initializes git; commit each completed ticket separately.
 - Every completed ticket must leave the app runnable, pass its relevant checks, and update the README when its behavior changes it. Remove unused scaffold code and dependencies.
 
 ### Routes and redirect flow

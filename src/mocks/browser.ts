@@ -1,15 +1,11 @@
 import { delay, http, HttpResponse } from 'msw';
 import { setupWorker } from 'msw/browser';
-import {
-  isAnonymousVisitorId,
-  isAttribution,
-} from '../features/attribution/attribution';
-import {
-  MIN_PASSWORD_LENGTH,
-  validateRegistration,
-} from '../features/registration/registration';
+import type { RegisteredUser } from '../types';
+import { isAnonymousVisitorId, isAttribution } from '../utils/attribution';
+import { MIN_PASSWORD_LENGTH, validateRegistration } from '../utils/validation';
 
 const FAILING_EMAIL = 'fail@example.com';
+const PENDING_STATE_VISIBLE_DELAY_MS = 500;
 
 function base64UrlJson(value: object) {
   const bytes = new TextEncoder().encode(JSON.stringify(value));
@@ -19,15 +15,17 @@ function base64UrlJson(value: object) {
     .replace(/=+$/, '');
 }
 
-// Stand-in backend: answers only POST /register (GET /register is the SPA page).
+function createUnsignedDemoToken(user: RegisteredUser) {
+  return `${base64UrlJson({ alg: 'none', typ: 'JWT' })}.${base64UrlJson({ sub: user.id, email: user.email })}.`;
+}
+
 export const worker = setupWorker(
   http.post('/register', async ({ request }) => {
-    await delay(500); // Fixed latency, so the pending state is visible.
+    await delay(PENDING_STATE_VISIBLE_DELAY_MS);
     const body: unknown = await request.json().catch(() => null);
     const { email, password, anonymousVisitorId, attribution } = (
       typeof body === 'object' && body !== null ? body : {}
     ) as Record<string, unknown>;
-    // Re-check the form's rules: the client is not a trust boundary.
     if (
       typeof email !== 'string' ||
       typeof password !== 'string' ||
@@ -59,8 +57,7 @@ export const worker = setupWorker(
       );
     }
     const user = { id: crypto.randomUUID(), email };
-    // JWT-shaped but unsigned (alg "none", empty signature): a demo token, not authentication.
-    const token = `${base64UrlJson({ alg: 'none', typ: 'JWT' })}.${base64UrlJson({ sub: user.id, email })}.`;
+    const token = createUnsignedDemoToken(user);
     return HttpResponse.json({ user, token }, { status: 201 });
   }),
 );

@@ -9,5 +9,5 @@ playwright/.cache/
 # Local design-agent context (skills, briefs, screenshots); not part of the app
 .agents/
 .impeccable/
-PRODUCT.md
-DESIGN.md
+docs/PRODUCT.md
+docs/DESIGN.md

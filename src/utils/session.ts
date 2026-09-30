@@ -1,30 +1,8 @@
-import { createContext, useContext } from 'react';
-
-export interface RegisteredUser {
-  id: string;
-  email: string;
-}
-
-export interface SessionContextValue {
-  user: RegisteredUser | null;
-  /** Returns false when the cookie could not be written (the session then lasts until reload). */
-  startSession: (user: RegisteredUser, token: string) => boolean;
-  endSession: () => void;
-}
-
-export const SessionContext = createContext<SessionContextValue | null>(null);
-
-export function useSession() {
-  const value = useContext(SessionContext);
-  if (!value) throw new Error('useSession must be used inside SessionProvider');
-  return value;
-}
+import type { RegisteredUser } from '../types';
 
 const SESSION_COOKIE = 'realplay_session';
 
-// Browser-session cookie (no Max-Age): no expiry timers, gone when the browser session ends.
-// Written by JavaScript, so it cannot be HttpOnly; a real backend would set that.
-function cookieAttributes() {
+function browserSessionCookieAttributes() {
   return `Path=/; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
 }
 
@@ -36,15 +14,15 @@ function readSessionToken() {
 }
 
 export function writeSessionCookie(token: string) {
-  document.cookie = `${SESSION_COOKIE}=${token}; ${cookieAttributes()}`;
-  return readSessionToken() === token;
+  document.cookie = `${SESSION_COOKIE}=${token}; ${browserSessionCookieAttributes()}`;
+  const isCookieSaved = readSessionToken() === token;
+  return isCookieSaved;
 }
 
 export function deleteSessionCookie() {
-  document.cookie = `${SESSION_COOKIE}=; Max-Age=0; ${cookieAttributes()}`;
+  document.cookie = `${SESSION_COOKIE}=; Max-Age=0; ${browserSessionCookieAttributes()}`;
 }
 
-// Demo-only decoding of the unsigned mock token; the cookie is untrusted input.
 export function readSessionCookie(): RegisteredUser | null {
   const token = readSessionToken();
   const payload = token?.split('.')[1];

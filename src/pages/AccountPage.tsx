@@ -1,10 +1,10 @@
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { useSession } from '../features/session/session';
+import { useSession } from '../hooks/useSession';
 
 export function AccountPage() {
   const { user } = useSession();
-  if (!user) return null; // Rendered only inside RequireSession.
+  if (!user) return null;
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 3, sm: 4 } }}>

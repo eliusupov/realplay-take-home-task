@@ -1,13 +1,4 @@
-import { createContext, useContext } from 'react';
-
-// The four URL modals. Values come from the URL: untrusted, rendered as text only.
-export type Modal =
-  | { type: 'welcome' }
-  | { type: 'promo'; params: { code: string } }
-  | { type: 'invite'; params: { friendId: string } }
-  | { type: 'registration' };
-
-export type ModalType = Modal['type'];
+import type { Modal, ModalType } from '../types';
 
 export const MODAL_QUERY_KEYS = {
   welcome: 'welcome',
@@ -38,31 +29,13 @@ function toModal(key: string, value: string): Modal | null {
   }
 }
 
-/**
- * The modals a query string asks for, in link order. Keys are case-sensitive;
- * a repeated key counts once, at its first occurrence and with its first value.
- */
 export function readModals(search: string): Modal[] {
   const params = new URLSearchParams(search);
   const modals: Modal[] = [];
-  for (const key of new Set(params.keys())) {
+  const uniqueKeysInLinkOrder = new Set(params.keys());
+  for (const key of uniqueKeysInLinkOrder) {
     const modal = toModal(key, params.get(key) ?? '');
     if (modal) modals.push(modal);
   }
   return modals;
-}
-
-export interface ModalContextValue {
-  /** Open entries in link order; only the first is shown. */
-  modals: Modal[];
-  openModal: (modal: Modal) => void;
-  closeModal: (type: ModalType) => void;
-}
-
-export const ModalContext = createContext<ModalContextValue | null>(null);
-
-export function useModals() {
-  const value = useContext(ModalContext);
-  if (!value) throw new Error('useModals must be used inside ModalProvider');
-  return value;
 }

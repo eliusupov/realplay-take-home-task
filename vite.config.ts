@@ -3,7 +3,6 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // React Compiler on React 18: compiled output imports react-compiler-runtime.
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset({ target: '18' })] }),
@@ -13,12 +12,10 @@ export default defineConfig({
   build: {
     rolldownOptions: {
       onwarn(warning, warn) {
-        // The runtime's own "use no memo" directive is a compiler opt-out marker; dropping it when bundling is harmless.
-        if (
+        const isCompilerRuntimeOptOutDirective =
           warning.code === 'MODULE_LEVEL_DIRECTIVE' &&
-          warning.id?.includes('react-compiler-runtime')
-        )
-          return;
+          warning.id?.includes('react-compiler-runtime');
+        if (isCompilerRuntimeOptOutDirective) return;
         warn(warning);
       },
     },

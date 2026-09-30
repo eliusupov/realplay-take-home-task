@@ -1,16 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
+import type { RegisteredUser } from '../types';
 import {
   deleteSessionCookie,
   readSessionCookie,
-  SessionContext,
   writeSessionCookie,
-  type RegisteredUser,
-} from './session';
+} from '../utils/session';
+import { SessionContext } from './SessionContext';
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  // Lazy initial state: restored synchronously, before any route guard renders.
   const [user, setUser] = useState(readSessionCookie);
 
   function startSession(nextUser: RegisteredUser, token: string) {
@@ -21,7 +20,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   function endSession() {
     deleteSessionCookie();
     setUser(null);
-    // App-owned request cache, including the registration mutation and its submitted values.
     queryClient.clear();
   }
 

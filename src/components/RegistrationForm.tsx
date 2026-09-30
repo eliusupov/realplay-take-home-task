@@ -4,13 +4,13 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { useMutation } from '@tanstack/react-query';
 import { useRef, useState, type FormEvent } from 'react';
+import { registerUser } from '../api/register';
+import type { RegisterResponse } from '../types';
 import {
   MIN_PASSWORD_LENGTH,
-  registerUser,
   validateRegistration,
-  type RegisterResponse,
   type RegistrationErrors,
-} from './registration';
+} from '../utils/validation';
 
 export function RegistrationForm({
   onRegistered,
@@ -32,11 +32,15 @@ export function RegistrationForm({
     if (nextErrors.email) emailRef.current?.focus();
     else if (nextErrors.password) passwordRef.current?.focus();
     else {
-      // Per-call callback: React Query skips it once this form unmounts
-      // (e.g. after logout), so a late result cannot start a session.
-      registration.mutate({ email, password }, { onSuccess: onRegistered });
+      const callbacksSkippedAfterUnmount = { onSuccess: onRegistered };
+      registration.mutate({ email, password }, callbacksSkippedAfterUnmount);
     }
   }
+
+  const renderRequestError = () => {
+    if (!registration.isError) return null;
+    return <Alert severity="error">{registration.error.message}</Alert>;
+  };
 
   return (
     <Stack component="form" noValidate onSubmit={handleSubmit} spacing={2.5}>
@@ -73,9 +77,7 @@ export function RegistrationForm({
         }
         inputRef={passwordRef}
       />
-      {registration.isError && (
-        <Alert severity="error">{registration.error.message}</Alert>
-      )}
+      {renderRequestError()}
       <Button
         type="submit"
         variant="contained"
