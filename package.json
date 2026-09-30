@@ -11,7 +11,6 @@
     "dev": "vite",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "format": "prettier --write .",
     "test": "playwright test",
     "build": "tsc -b && vite build",
     "preview": "vite preview"

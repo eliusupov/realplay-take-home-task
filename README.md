@@ -17,7 +17,6 @@ npx playwright install chromium   # once, if the browser is not cached yet
 npm run dev         # Vite dev server on http://localhost:5173
 npm run typecheck   # strict TypeScript, no emit (tsc -b: browser app and Node configs/tests checked separately)
 npm run lint        # ESLint (typescript-eslint strict type-checked, react-hooks, react-refresh)
-npm run format      # Prettier
 npm test            # Playwright against the running app
 npm run build       # type-check, then production build into dist/
 npm run preview     # serve dist/ on http://localhost:4173
