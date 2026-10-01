@@ -1,18 +1,19 @@
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { useSession } from '../hooks/useSession';
 import { paths } from '../routes/paths';
 
 export function HomePage() {
   const { user } = useSession();
+  const { search } = useLocation();
 
   const renderRegisterButton = () => {
     if (user) return null;
     return (
       <Button
         component={RouterLink}
-        to={paths.register}
+        to={{ pathname: paths.register, search }}
         variant="contained"
         size="large"
         sx={{ mt: 4 }}

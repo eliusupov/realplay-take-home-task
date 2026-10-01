@@ -3,6 +3,12 @@ export interface RegisteredUser {
   email: string;
 }
 
+export interface ReturnLocation {
+  pathname: string;
+  search: string;
+  hash: string;
+}
+
 export interface Attribution {
   params: Record<string, string>;
   capturedAt: string;

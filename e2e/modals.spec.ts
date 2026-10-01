@@ -137,6 +137,9 @@ test('refresh, history and in-app navigation follow the current URL', async ({
   await page
     .getByRole('link', { name: /Account/, includeHidden: true })
     .dispatchEvent('click');
+  await expect(page).toHaveURL('/account?welcome=1');
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page).toHaveURL('/account');
   await expect(page.getByRole('dialog')).toBeHidden();
 

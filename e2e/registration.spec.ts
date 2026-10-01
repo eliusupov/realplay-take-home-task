@@ -91,7 +91,7 @@ test('registration sends a JSON body and returns to the requested page with a to
   );
   await expect(page.getByRole('main')).toContainText('ada@example.com');
   await page.getByRole('link', { name: 'Account (ada@example.com)' }).click();
-  await expect(page).toHaveURL('/account');
+  await expect(page).toHaveURL('/account?x=1');
 });
 
 test('without a stored origin, registration returns home keeping its own query and hash', async ({
@@ -138,7 +138,46 @@ test('leaving the page while registration is pending does not sign the visitor i
   await expect.poll(() => hasCookie(ATTRIBUTION_COOKIE)).toBe(false);
 
   expect(await hasCookie(SESSION_COOKIE)).toBe(false);
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/?utm_source=pending');
   await expect(page.getByRole('button', { name: 'Log out' })).toBeHidden();
   await expect(page.getByRole('alert')).toBeHidden();
+});
+
+test('a pop-up link survives leaving /register before signing up, then is forgotten', async ({
+  page,
+}) => {
+  await page.goto('/account?utm_source=google&promo=SPRING&welcome=1');
+  await expect(page).toHaveURL('/register');
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
+  await submitRegistration(page, 'ada@example.com', 'correct horse');
+
+  await expect(page).toHaveURL(
+    '/account?utm_source=google&promo=SPRING&welcome=1',
+  );
+  await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Log out' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
+  await submitRegistration(page, 'grace@example.com', 'correct horse');
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('dialog')).toBeHidden();
+});
+
+test('a direct /register pop-up link also survives a detour', async ({
+  page,
+}) => {
+  await page.goto('/register?welcome=1');
+  await expect(
+    page.getByRole('heading', { name: 'Create an account' }),
+  ).toBeVisible();
+  await page.goto('/');
+  await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
+  await submitRegistration(page, 'ada@example.com', 'correct horse');
+
+  await expect(page).toHaveURL('/?welcome=1');
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
 });

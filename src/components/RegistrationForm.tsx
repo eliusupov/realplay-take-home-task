@@ -5,7 +5,7 @@ import TextField from '@mui/material/TextField';
 import { useMutation } from '@tanstack/react-query';
 import { useRef, useState, type FormEvent } from 'react';
 import { registerUser } from '../api/register';
-import type { RegisterResponse } from '../types';
+import type { RegisterRequest, RegisterResponse } from '../types';
 import {
   MIN_PASSWORD_LENGTH,
   validateRegistration,
@@ -23,6 +23,13 @@ export function RegistrationForm({
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const registration = useMutation({ mutationFn: registerUser });
+
+  function showErrorFor(field: keyof RegisterRequest) {
+    setErrors({
+      ...errors,
+      [field]: validateRegistration({ email, password })[field],
+    });
+  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -55,6 +62,9 @@ export function RegistrationForm({
           setEmail(event.target.value);
           setErrors({ ...errors, email: undefined });
         }}
+        onBlur={() => {
+          showErrorFor('email');
+        }}
         error={Boolean(errors.email)}
         helperText={errors.email}
         inputRef={emailRef}
@@ -69,6 +79,9 @@ export function RegistrationForm({
         onChange={(event) => {
           setPassword(event.target.value);
           setErrors({ ...errors, password: undefined });
+        }}
+        onBlur={() => {
+          showErrorFor('password');
         }}
         error={Boolean(errors.password)}
         helperText={

@@ -5,9 +5,10 @@ import { renderWithProviders } from '../../test/renderWithProviders';
 import type { RegisteredUser } from '../../types';
 import { Header } from '../Header';
 
-function renderHeader(signedInAs?: RegisteredUser) {
+function renderHeader(signedInAs?: RegisteredUser, url = '/') {
   const onLogOut = vi.fn<() => void>();
   const rendered = renderWithProviders({
+    url,
     routes: <Route path="/" element={<Header onLogOut={onLogOut} />} />,
     signedInAs,
   });
@@ -35,6 +36,21 @@ describe('Header', () => {
     });
     expect(accountLink).toHaveTextContent('A');
     expect(accountLink).toHaveAttribute('href', '/account');
+  });
+
+  it('keeps the current query string on every header link', () => {
+    renderHeader(
+      { id: 'u1', email: 'ada@example.com' },
+      '/?utm_source=google&x=1#top',
+    );
+
+    for (const [name, href] of [
+      ['Realplay', '/?utm_source=google&x=1'],
+      ['Home', '/?utm_source=google&x=1'],
+      ['Account (ada@example.com)', '/account?utm_source=google&x=1'],
+    ]) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
+    }
   });
 
   it('calls the log out handler', async () => {

@@ -1,38 +1,59 @@
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { Navigate, useLocation, type Path } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, useLocation, type Location } from 'react-router-dom';
 import { RegistrationForm } from '../components/RegistrationForm';
 import { useSession } from '../hooks/useSession';
 import { useShowToast } from '../hooks/useShowToast';
 import { paths } from '../routes/paths';
 import type { RegisterResponse } from '../types';
+import { readModals } from '../utils/modals';
+import {
+  forgetReturnLocation,
+  readRememberedReturnLocation,
+  rememberReturnLocation,
+  toReturnLocation,
+} from '../utils/returnLocation';
 
-function readReturnLocation(state: unknown): Partial<Path> | null {
-  const from: unknown =
-    typeof state === 'object' && state !== null && 'from' in state
-      ? state.from
-      : null;
-  if (typeof from !== 'object' || from === null) return null;
-  const { pathname, search, hash } = from as Record<string, unknown>;
-  return typeof pathname === 'string' &&
-    typeof search === 'string' &&
-    typeof hash === 'string'
-    ? { pathname, search, hash }
+function readFrom(state: unknown) {
+  return typeof state === 'object' && state !== null && 'from' in state
+    ? toReturnLocation(state.from)
     : null;
+}
+
+function homeWithOwnQuery({ search, hash }: Location) {
+  return { pathname: paths.home, search, hash };
+}
+
+function readLinkedLocation(location: Location) {
+  const hasModalTriggers = readModals(location.search).length > 0;
+  return (
+    readFrom(location.state) ??
+    (hasModalTriggers ? homeWithOwnQuery(location) : null)
+  );
 }
 
 export function RegisterPage() {
   const { user, startSession } = useSession();
   const location = useLocation();
   const showToast = useShowToast();
+  const [rememberedLocation] = useState(readRememberedReturnLocation);
+  const linkedLocation = readLinkedLocation(location);
+
+  useEffect(
+    function rememberWhereToReturnUntilRegistered() {
+      if (user) forgetReturnLocation();
+      else if (linkedLocation) rememberReturnLocation(linkedLocation);
+    },
+    [user, linkedLocation],
+  );
 
   if (user) {
-    const returnLocation = readReturnLocation(location.state) ?? {
-      pathname: paths.home,
-      search: location.search,
-      hash: location.hash,
-    };
+    const returnLocation =
+      readFrom(location.state) ??
+      rememberedLocation ??
+      homeWithOwnQuery(location);
     return <Navigate to={returnLocation} replace />;
   }
 

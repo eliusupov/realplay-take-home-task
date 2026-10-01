@@ -21,6 +21,7 @@ afterEach(() => {
   server.resetHandlers();
   cleanup();
   clearCookies();
+  sessionStorage.clear();
 });
 
 afterAll(() => {

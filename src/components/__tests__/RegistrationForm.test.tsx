@@ -36,6 +36,29 @@ describe('RegistrationForm', () => {
     expect(onRegistered).not.toHaveBeenCalled();
   });
 
+  it('shows a field error when leaving the field and clears it while typing', async () => {
+    const { user } = renderForm();
+    const email = screen.getByLabelText(/Email/);
+    const password = screen.getByLabelText(/Password/);
+
+    await user.type(email, 'ada');
+    expect(email).not.toHaveAccessibleDescription();
+    await user.tab();
+
+    expect(email).toHaveAccessibleDescription(
+      'Enter an email address like name@example.com.',
+    );
+    expect(password).toHaveAccessibleDescription('At least 8 characters.');
+
+    await user.type(email, '@example.com');
+    expect(email).not.toHaveAccessibleDescription();
+
+    await user.type(password, 'short');
+    await user.tab();
+    expect(password).toHaveAccessibleDescription('Use at least 8 characters.');
+    expect(email).not.toHaveAccessibleDescription();
+  });
+
   it('disables submit while the request is pending and reports the registered user', async () => {
     const { user, onRegistered } = renderForm();
 
