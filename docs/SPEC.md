@@ -112,7 +112,7 @@ Logout ends the mock session, clears modal and cached user state, and navigates 
 
 ### Code organization and coding standards
 
-These standards apply to every implementation ticket. They reflect the user's request for a clean, production-ready folder structure and clear naming; authentication and business services remain explicitly mocked.
+These standards apply to all implementation work. They reflect the user's request for a clean, production-ready folder structure and clear naming; authentication and business services remain explicitly mocked.
 
 - Use a conventional React layout: `components/`, `pages/`, `routes/` (router config and route guards), `context/`, `hooks/`, `api/`, `utils/`, `mocks/`. Create a folder only when it holds real code; no barrel files or speculative layers.
 - Keep dependency direction clear: pages and components use hooks, context, api, and utils; utils import nothing from React layers. Avoid circular imports.
@@ -129,8 +129,8 @@ These standards apply to every implementation ticket. They reflect the user's re
 - Configure consistent linting and formatting, reproducible dependency installation, and scripts for development, type checking, linting, tests, production build, and preview. Keep the toolchain small and compatible with React 18.
 - Test externally visible behavior at a focused application boundary. Share one harness, control time in tests, and avoid tests coupled to provider internals or component implementation details.
 - Keep secrets and credentials out of source, persisted client state, diagnostics, and logs. Document mock security limitations and every deliberate product assumption.
-- Delivery is a git repository with a lean `README.md` (what it is, how to run it, key behavior, example links). Ticket 01 initializes git; commit each completed ticket separately.
-- Every completed ticket must leave the app runnable, pass its relevant checks, and update the README when its behavior changes it. Remove unused scaffold code and dependencies.
+- Delivery is a git repository with a lean `README.md` (what it is, how to run it, key behavior, example links). Commit each completed change separately.
+- Every completed change must leave the app runnable, pass its relevant checks, and update the README when its behavior changes it. Remove unused scaffold code and dependencies.
 
 ### Routes and redirect flow
 
