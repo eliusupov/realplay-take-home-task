@@ -1,35 +1,38 @@
 # Realplay: registration with attribution + redirect
 
-React 18 take-home: first-touch campaign attribution kept through registration and redirects, plus URL-triggered modals for signed-in users. Backend mocked with MSW.
+React 18 take-home: first-touch campaign attribution kept from the first visit to sign-up, plus URL-triggered modals for signed-in users. Backend mocked with MSW.
 
 ## Run
 
-Requires Node 24.12+ and npm 11.
+Requires Node 24.12+.
 
 ```bash
 npm ci
 npm run dev   # http://localhost:5173
 ```
 
-## Scripts
+## How it works
 
-- `npm run build`: type-check and production build into `dist/`
-- `npm run preview`: serve the production build on http://localhost:4173
-- `npm run typecheck`: strict TypeScript, no emit
-- `npm run lint`: ESLint
-- `npm test`: unit/component tests with Vitest
-- `npm run test:e2e`: Playwright end-to-end (first run: `npx playwright install chromium`)
+- **Attribution capture** (`src/utils/attribution.ts`, `src/components/Layout.tsx`): while signed out, a layout effect reads `utm_*`, `ref`, `gclid` and `fbclid` before any redirect runs. One first-touch record `{ params, capturedAt }` lives in the first-party cookie `realplay_attribution` (URI-encoded JSON, `Path=/`, `SameSite=Lax`, `Secure` on https). After logout, capture pauses until the next full page load.
+- **30-day rule and renewal** (`src/utils/attribution.ts`): a record younger than 30 days wins; new params are ignored. On every signed-out visit it is re-written with `Max-Age` set to what is left of its 30 days, so the expiry stays put but Safari's 7-day cap on script-written cookies restarts. `capturedAt` never moves. An expired or invalid record counts as absent: the next tagged visit replaces it, untagged visits store nothing.
+- **Session** (`src/utils/session.ts`, `src/context/SessionProvider.tsx`): the mock user's JSON sits in the `realplay_session` cookie, is restored on reload and deleted on logout.
+- **Modals** (`src/context/ModalProvider.tsx`, `src/hooks/useModals.ts`): the URL is the only modal state. `welcome=1`, `promo=<code>`, `invite=<friendId>`, `signup=1`. `useModals()` returns `modals`, `openModal({ type, params })`, which adds the trigger to the URL, and `closeModal(type)`, which removes only its own key. One modal at a time, in link order, only when signed in; a signed-out visitor with a trigger is sent to `/register`.
+- **Query kept everywhere** (`src/components/Header.tsx`, `src/routes/RequireSession.tsx`): every in-app link and button, the redirect to `/register`, the return after registering and logout keep the query string as is. Links and the redirect drop the hash; the redirect keeps it in `from`, so the return restores it. While signed out with a modal trigger in the URL, the header hides Home and the logo is plain text.
+- **Return after registering** (`src/pages/RegisterPage.tsx`, `src/utils/returnLocation.ts`): the redirect passes the original location as `from`, and it is also remembered in `sessionStorage`, so leaving `/register` and registering later still returns to the link. Order: the current page's link (`from`, or `/` plus `/register`'s own query when it has modal triggers), then the remembered one, then `/` plus the own query. Then it is forgotten.
+- **Mock backend** (`src/mocks/handlers.ts`, `src/api/register.ts`): `POST /register` takes `{ email, password, attribution }`; the attribution cookie is cleared on success and kept on failure. `fail@example.com` gets HTTP 500.
+
+## Why cookies
+
+First-party cookies are the standard for attribution (Google `_gcl_aw`, Meta `_fbc`). With no backend, JS writes them and the `POST /register` body carries the values; server-set cookies would be a backend-only change.
 
 ## Try it
 
-Start each block signed out, in a private window, or after DevTools > Application > Storage > Clear site data. Watch Application > Cookies and the `POST /register` body in Network. Signed in = registered at `/register` with any email and an 8+ character password.
+Reset before each step: a private window, or DevTools > Application > Storage > Clear site data. "After step 1" means run step 1 first. Watch Application > Cookies and the `POST /register` body in Network. Signed in = registered at `/register` with any email and an 8+ character password.
 
-**Attribution**
-
-1. Capture: <http://localhost:5173/?utm_source=google&utm_campaign=spring&gclid=G1&fbclid=F1&ref=partner42&other=x>. The `realplay_attribution` cookie holds the five tracked params (not `other`) and `capturedAt`; `realplay_anonymous_visitor_id` holds a UUID.
-2. First touch wins within 30 days: then open <http://localhost:5173/?utm_source=instagram>. The cookie is unchanged.
-3. Untagged visits record nothing: clean data, open <http://localhost:5173/>. No attribution cookie. Then step 1 captures normally.
-4. After 30 days, a new campaign replaces it: after step 1, age the record in the DevTools console, then open <http://localhost:5173/?utm_source=newsletter>. The cookie now holds `newsletter` with a new `capturedAt`. Repeat from step 1 with clean data and `days = 29`: it stays `google`.
+1. Capture: <http://localhost:5173/?utm_source=google&utm_campaign=spring&gclid=G1&fbclid=F1&ref=partner42&other=x>. `realplay_attribution` holds the five tracked params (not `other`) and `capturedAt`.
+2. First touch within 30 days: after step 1, open <http://localhost:5173/?utm_source=instagram>. The cookie value is unchanged.
+3. Untagged visits: open <http://localhost:5173/>. No attribution cookie.
+4. 30-day expiry: after step 1, run this in the console, then open <http://localhost:5173/?utm_source=newsletter>. The cookie now holds `newsletter` with a new `capturedAt`. With `days = 29` it stays `google`.
 
    ```js
    const days = 31;
@@ -39,26 +42,25 @@ Start each block signed out, in a private window, or after DevTools > Applicatio
    document.cookie = `realplay_attribution=${encodeURIComponent(JSON.stringify(r))}; Path=/`;
    ```
 
-5. Sent, then cleared: after step 1, open <http://localhost:5173/register> and register. The payload has `attribution` and `anonymousVisitorId`, a toast shows, and the attribution cookie is gone while the UUID stays.
-6. A failure keeps it: after step 1, register with `fail@example.com`. HTTP 500 and an error; the cookie remains. Retry with another email: the payload still carries it.
-7. Logout keeps the UUID: after step 5, log out, open <http://localhost:5173/register> and register again. Same `anonymousVisitorId`, `attribution: null`.
+5. Sent, then cleared: after step 1, open <http://localhost:5173/register> and register. The payload has `attribution`, a toast shows, and the cookie is gone.
+6. Failure keeps it: after step 1, register at <http://localhost:5173/register> with `fail@example.com`. HTTP 500, an error shows, the cookie stays. Change the email and register: the payload still carries it.
+7. Deep link while signed out: <http://localhost:5173/account?utm_source=google&promo=SPRING&welcome=1#top> goes to `/register` with the same query; Home is hidden. Register: the payload carries `utm_source`, you land on `/account?...#top`, and Promo then Welcome open.
+8. Detour: open the step 7 link, then in the same tab open <http://localhost:5173/> in the address bar, click Register and register. You still land on `/account?...#top` with Promo then Welcome.
+9. All four, in link order (signed in): <http://localhost:5173/?welcome=1&invite=friend_8f3a2c&promo=SPRING&signup=1>. Welcome, Invite, Promo, Registration, one at a time. Closing one (button, Escape or backdrop) removes only its param. Reorder the params and the order follows.
+10. Invalid values are ignored: <http://localhost:5173/?welcome=2&promo=&signup=0> opens nothing when signed in and does not redirect when signed out.
+11. Back/forward (signed in): open <http://localhost:5173/?promo=SPRING>, then open <http://localhost:5173/account> in the address bar. Press Back: Promo opens again. Forward: no modal.
+12. Logout keeps the query (signed in): open <http://localhost:5173/account?utm_source=newsletter> and log out. You land on `/?utm_source=newsletter` with no attribution cookie; reload and it is captured.
 
-**Redirect and modals**
+## Open question
 
-8. Deep link while signed out: <http://localhost:5173/account?utm_source=google&promo=SPRING&welcome=1#top> goes to `/register` with the same query. Register: the payload carries the attribution, you return to `/account?...#top`, and Promo then Welcome open.
-9. Detour: open the step 8 link (Home is hidden while a pop-up is pending), then open <http://localhost:5173/> in the address bar, click Register, and register. You still return to `/account?...` with Promo then Welcome.
-10. Link order, one at a time (signed in): <http://localhost:5173/?welcome=1&invite=friend_8f3a2c&promo=SPRING&signup=1>. Closing each (button, Escape, or backdrop) removes only its own param and shows the next. Reorder the params and the order follows.
-11. Any page: <http://localhost:5173/account?invite=friend_8f3a2c> (signed in).
-12. Refresh and back/forward (signed in): open <http://localhost:5173/?welcome=1> and refresh: it reopens. With it still open, type <http://localhost:5173/account> in the address bar (the modal blocks header clicks), press Back: Welcome reopens; Forward: it closes.
-13. `signup=1`: signed out, <http://localhost:5173/?signup=1> goes to `/register`. Signed in, it shows the Registration placeholder.
-14. Invalid values are ignored: <http://localhost:5173/?welcome=2&promo=> opens nothing, signed in or out, and doesn't redirect to `/register`.
-15. Session: refresh `/account` while signed in and you stay signed in. Log out and you land on `/` with the same query; campaign params in it are recorded again only after a reload.
+The task maps `signup=1` to a Registration modal, but modals show only to signed-in users, so its purpose is unspecified. It shows a short "You're registered and signed in." confirmation. Would confirm with the team.
 
-## Behavior
+## Scripts
 
-- Attribution: `utm_*`, `ref`, `gclid`, `fbclid`. First touch kept 30 days in a first-party cookie (`realplay_attribution`), with an anonymous visitor UUID in `realplay_anonymous_visitor_id`; both are renewed on each visit. Safari may cap these script-written cookies at 7 days. Cleared on successful registration, kept on logout.
-- Why cookies, not localStorage: first-party cookies are the production standard for attribution (Google `_gcl_aw`, Meta `_fbc`). The server can read and set them, they can span subdomains, and they expire natively; localStorage is JS-only and single-origin. With no backend, JS writes them and the `POST /register` body still carries the values. Server-set HttpOnly cookies (beating Safari's cap) would be a backend-only change.
-- Modals: `welcome=1`, `promo=<code>`, `invite=<friendId>`, `signup=1`. Signed-in only, one at a time in link order; closing removes only its own param. A pop-up link survives leaving `/register`: register later and you still return to it.
-- Every link, redirect and logout keeps the URL's query params. While signed out with a pop-up pending, the header hides Home. After logout, campaign params left in the URL are recorded again only on a reload.
-- Mock auth: email + password of 8+ chars, cookie session; field errors show when you leave a field. No login: after logout you can only register again.
-- Open question: The task maps `signup=1` to a Registration modal but shows modals only to authenticated users; its purpose is not specified, so it is a placeholder handled like the other modals. Would confirm with the team.
+- `npm run dev`: dev server on http://localhost:5173
+- `npm run build`: type-check and production build into `dist/`
+- `npm run preview`: serve the build on http://localhost:4173
+- `npm run typecheck`: strict TypeScript, no emit
+- `npm run lint`: ESLint
+- `npm test`: Vitest unit and component tests
+- `npm run test:e2e`: Playwright end-to-end (first run: `npx playwright install chromium`)
