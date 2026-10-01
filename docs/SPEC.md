@@ -14,7 +14,7 @@ This spec synthesizes the conversation. Explicit task requirements, user-selecte
 
 Build a React 18, TypeScript, and Vite application using MUI, React Router, and React Query. Session and modal state live in React Context; no external state library. Provide a home page, a registration page, and a protected account page. Use one modal-stack provider and one authenticated modal renderer at the app root.
 
-Capture attribution before any registration redirect. Persist one first-touch record in localStorage for a 30-day window, started only by a visit that carries tracking parameters, alongside a browser-scoped anonymous UUID. Submit the attribution and UUID with the registration credentials to a mocked endpoint (MSW) through a React Query mutation.
+Capture attribution before any registration redirect. Persist one first-touch record in a first-party cookie for a 30-day window, started only by a visit that carries tracking parameters, alongside a browser-scoped anonymous UUID in its own cookie. Submit the attribution and UUID with the registration credentials to a mocked endpoint (MSW) through a React Query mutation.
 
 On successful registration, establish the mock session in a cookie and React state, clear the pending attribution, return the visitor to the originally requested location (path, query, hash), and show a success toast. The navigation must not destroy the toast.
 
@@ -78,6 +78,10 @@ Logout ends the mock session, clears modal and cached user state, and navigates 
 52. As a visitor, I want malformed or unavailable browser storage handled without crashing, so that browser restrictions do not break registration.
 53. As a visitor, I want credentials excluded from persistent browser data, logs, and tokens, so that the demo does not unnecessarily expose passwords.
 54. As a reviewer, I want assumptions and mock limitations documented, so that I can distinguish task compliance from production authentication or analytics.
+55. As a visitor, I want my first touch and anonymous UUID kept in first-party cookies, so that persistence follows the industry-standard mechanism that a backend can later read and take over.
+56. As a returning visitor, I want each visit to renew the cookies' remaining lifetime without moving the capture time, so that browser caps on script-written cookies do not drop my first touch while I keep returning.
+57. As a visitor whose browser refuses cookies, I want attribution kept for the page session with a notice, so that registration still carries it and I know a reload would lose it.
+58. As a reviewer, I want attribution and the UUID visible under the site's cookies in DevTools, so that I can verify capture without reading code.
 
 ## Implementation Decisions
 
@@ -86,7 +90,7 @@ Logout ends the mock session, clears modal and cached user state, and navigates 
 - The supplied PDF is the complete assignment (its second page is blank).
 - Explicit assignment requirements govern routing, modal authentication, first-touch retention, and the registration payload.
 - The title's "+ Redirect" is satisfied by returning the visitor to the originally requested location after registration.
-- User-selected decisions: React Context instead of an external state library; a minimal email/password form; a session cookie; an anonymous UUID; the email-initial avatar; logout without attribution or UUID cleanup; URL order for modals; MSW for the mocked endpoint; only tracked visits start the attribution window.
+- User-selected decisions: React Context instead of an external state library; a minimal email/password form; a session cookie; an anonymous UUID; the email-initial avatar; logout without attribution or UUID cleanup; URL order for modals; MSW for the mocked endpoint; only tracked visits start the attribution window; first-party cookies (the industry-standard mechanism) for attribution and the anonymous UUID, replacing the earlier localStorage choice.
 - Closing a URL modal removes only its own parameter.
 - Promo and Invite contents are demonstrative, derived only from their parameter values. The Registration modal is a neutral placeholder because the task does not specify its purpose.
 - Proposed edge-case defaults below complete the design without introducing unrelated product features.
@@ -98,7 +102,7 @@ Logout ends the mock session, clears modal and cached user state, and navigates 
 - Keep the implementation simple: deliver the requirements with best practices and nothing more.
 - Use MUI Dialog for modal presentation and MUI Snackbar, optionally containing Alert, for notifications.
 - Keep responsibilities small: attribution capture/persistence, mocked registration, session state, modal provider, URL synchronization, routes/forms, and root-level notifications.
-- React Context (with `useState`/`useReducer`) holds reactive session and modal state. Browser storage handles persistence; cookie changes alone do not trigger React rendering.
+- React Context (with `useState`/`useReducer`) holds reactive session and modal state. Cookies handle persistence; cookie changes alone do not trigger React rendering.
 - Expose a modal-stack provider with `openModal({ type, params })` and `closeModal(type)`. Do not add a second competing source of modal state.
 - Register one modal renderer at the application root. Render modal content only when the mock session is authenticated.
 - Registration uses a React Query mutation. Keep request state in React Query rather than duplicating pending/error state in Context.
@@ -113,10 +117,10 @@ These standards apply to every implementation ticket. They reflect the user's re
 - Write self-documenting code with no comments. Replace inline conditional JSX (`&&`, ternaries, inline `.map` blocks) with named render functions called from the JSX.
 - The root route has an `ErrorBoundary` as its `errorElement` for unexpected errors and unknown URLs.
 - Use descriptive domain names such as attribution, capturedAt, anonymousVisitorId, returnLocation, and registeredUser. Name booleans as predicates, actions as verbs, and time values with explicit units.
-- Enable strict TypeScript. Model modal variants and API contracts explicitly. Treat parsed cookies, storage, URL values, and request bodies as untrusted until validated; avoid unchecked casts, non-null assertions, and unexplained any types.
+- Enable strict TypeScript. Model modal variants and API contracts explicitly. Treat parsed cookies, URL values, and request bodies as untrusted until validated; avoid unchecked casts, non-null assertions, and unexplained any types.
 - Keep components, hooks, and functions focused. Separate rendering from attribution/session rules without creating unnecessary service, repository, factory, or adapter layers.
-- Keep one owner for each state: React Query for registration request state, React Context for the session, the URL for modal intent (the provider's modal list is written only from the URL), and browser storage for persisted records.
-- Centralize actual shared constants and repeated rules, particularly storage keys, cookie attributes, and the attribution duration. Do not create configuration for values that have no genuine variation.
+- Keep one owner for each state: React Query for registration request state, React Context for the session, the URL for modal intent (the provider's modal list is written only from the URL), and cookies for persisted records.
+- Centralize actual shared constants and repeated rules, particularly cookie names, cookie attributes, and cookie lifetimes (including the attribution duration). Do not create configuration for values that have no genuine variation.
 - Clean up listeners, subscriptions, timers, and asynchronous work. Handle repeated React development execution, route changes, logout, and late request completion safely.
 - Use MUI/native accessibility features, semantic elements, associated labels/errors, keyboard operation, and responsive layouts. Do not replace accessible controls with click-only containers.
 - Unit/component tests live in a `__tests__` folder next to the code (Vitest + React Testing Library, MSW node server); real-browser flows live in `e2e/` (Playwright).
@@ -140,7 +144,7 @@ These standards apply to every implementation ticket. They reflect the user's re
 - Router state cannot be set by an external link, so `from` needs no open-redirect validation. It survives a reload of `/register`; opening `/register` fresh has no `from`.
 - Once authenticated on `/register` — after registration success, or on arrival with an existing session — navigate (replace) to `from`. Fallback when `from` is absent: `/` with `/register`'s own query and hash, so a direct `/register?promo=X` link keeps its modal intent.
 - The returned location's modal parameters then display, first eligible modal in URL order. `signup` gets no special handling.
-- Preserve attribution in localStorage independently of redirect URL construction. It need not be appended to internal links.
+- Preserve attribution in its cookie independently of redirect URL construction. It need not be appended to internal links.
 - Use route replacement for automatic auth redirects and for removing a closed modal's URL parameter. Explicit user navigation may add history entries normally.
 - Back/forward must still follow actual browser history: if navigation returns to an entry containing a trigger, that trigger is eligible again.
 - Keep the success notification at the root so the registration-page unmount does not dismiss it.
@@ -228,14 +232,20 @@ These standards apply to every implementation ticket. They reflect the user's re
 
 ### Storage choice and limitations
 
-- Use localStorage for attribution and the anonymous UUID. The registration request explicitly reads the saved values and places them in its body.
-- localStorage has no automatic expiry. Enforce the 30-day rule using `capturedAt` whenever attribution is read.
-- A cookie would also be valid, but its automatic request header would not satisfy the payload requirement by itself; localStorage is the simpler flow here.
-- Do not use IndexedDB or duplicate attribution into multiple storage systems.
-- Handle missing records, malformed JSON, invalid timestamps, and storage access failures without crashing.
-- Recovery: treat an invalid attribution record as absent (the capture rule then applies). If persistence is unavailable, keep the record in memory for the current page session and disclose that reload persistence is unavailable.
-- A 30-day window is an application rule, not guaranteed retention. Browser privacy policies, private browsing, and user deletion can remove data earlier.
-- Restrict cleanup to this application's keys and cookie.
+- Persist attribution and the anonymous UUID in first-party cookies, the standard mechanism for click-ID and visitor-ID persistence (for example Google Ads `_gcl_aw`, Google Analytics `_ga`, Meta `_fbc`/`_fbp`).
+- One cookie per record: `realplay_attribution` holds the URI-encoded JSON record `{ params, capturedAt }`; `realplay_anonymous_visitor_id` holds the UUID.
+- Every app cookie (session, attribution, UUID) shares one attribute set: `Path=/`, `SameSite=Lax`, `Secure` on HTTPS, host-only (no `Domain`). Define it once.
+- Lifetimes use `Max-Age`, never `Expires`, so expiry does not depend on converting the app's clock into a date: attribution 30 days from capture, UUID 400 days (the longest cookie lifetime Chrome honors).
+- Whenever capture runs (application entry and route changes while unauthenticated), re-write each valid cookie with the same value and its remaining lifetime (attribution: 30 days minus its age; UUID: a fresh 400 days). The registration snapshot also renews the UUID. Browsers that cap JavaScript-written cookie lifetime (Safari) then keep the cookies while the visitor keeps returning within that cap. Re-writing never changes `capturedAt`.
+- `capturedAt` stays authoritative: enforce the 30-day rule from it on every read. Cookie expiry is cleanup only; the cookie is client-editable, and test clocks do not move the browser's cookie clock.
+- These cookies are written by JavaScript, so they cannot be HttpOnly. The registration request reads them and places the values in its JSON body. The browser also sends them in the `Cookie` header of same-origin requests; the body remains the contract and the mock reads only the body.
+- Do not mirror attribution or the UUID into localStorage, sessionStorage, or IndexedDB. Earlier localStorage keys are not migrated (demo).
+- Handle missing cookies, undecodable values, malformed JSON, invalid timestamps, invalid UUIDs, and blocked cookies without crashing.
+- Verify each write by reading it back. A write that does not read back (cookies disabled, or a value over the roughly 4 KB per-cookie limit) keeps that value in memory for the current page session. A probe cookie checked once at load decides whether to disclose that reload persistence is unavailable; an individually oversized record falls back silently.
+- Recovery: treat an invalid attribution record as absent (the capture rule then applies); replace an invalid UUID with a new one.
+- A 30-day window is an application rule, not guaranteed retention. Browser privacy policies (Safari caps JavaScript-written cookies at 7 days, and at 24 hours after some navigations from known trackers with decorated links), private browsing, and user deletion can remove data earlier.
+- Production path (out of scope: there is no backend): the server sets these cookies with `Set-Cookie` and reads attribution from the request at registration. Server-set cookies escape Safari's cap on script-written cookies, can be HttpOnly, can use `Domain` to share attribution across subdomains, and reach the server from the first request.
+- Restrict cleanup to this application's cookies. Clearing attribution expires `realplay_attribution` with `Max-Age=0` and the same attributes.
 
 ### Registration form, validation, and request contract
 
@@ -290,7 +300,8 @@ These standards apply to every implementation ticket. They reflect the user's re
 ### Proposed testing boundary
 
 - Unit/component tests (Vitest + React Testing Library, jsdom) in a `__tests__` folder next to the code they cover. Render through the real providers and router (`src/test/renderWithProviders.tsx`); the MSW node server serves the same handlers as the browser worker.
-- End-to-end tests (Playwright) in `e2e/`, split by area, drive the real app in a real browser (real history, cookies, localStorage, and the MSW worker). Control time with Playwright's clock API for the 30-day rule; no time-travel controls in the product UI.
+- End-to-end tests (Playwright) in `e2e/`, split by area, drive the real app in a real browser (real history, cookies, and the MSW worker). Control time with Playwright's clock API for the 30-day rule; no time-travel controls in the product UI. The clock moves page time, not the browser's cookie expiry, so the 30-day tests exercise `capturedAt`.
+- Seed and inspect attribution and UUID cookies through the browser context's cookie APIs; prior art is the existing attribution e2e suite and the session-cookie helper.
 - Test behavior through public interfaces (roles, labels, URLs, the outbound `POST /register` body), not provider internals. Assert attribution and identity fields without logging credentials.
 - A few focused, meaningful checks per file. No tests that restate implementation details.
 
@@ -307,7 +318,8 @@ These standards apply to every implementation ticket. They reflect the user's re
 9. Authenticated `signup=1` shows the placeholder Registration modal and creates no account; an unauthenticated signup link redirects to the registration page like any other trigger.
 10. Session reload restoration and protected-route handling work; malformed cookies do not grant protected access. There is no automatic session expiry.
 11. Logout clears session, cached user, and modal state while preserving any pending attribution and the UUID. Subsequent unauthenticated capture follows the same first-touch rules without resetting a retained timestamp or regenerating the UUID.
-12. Corrupt or unavailable storage does not crash the app; keyboard navigation and modal focus/dismissal remain usable.
+12. Corrupt, undecodable, or refused cookies do not crash the app; when the browser refuses cookies, attribution is kept for the page session with a notice; an oversized record falls back silently; keyboard navigation and modal focus/dismissal remain usable.
+13. Attribution and UUID cookies carry `Path=/`, `SameSite=Lax`, and the specified lifetimes; each visit re-writes them without moving `capturedAt`; successful registration expires only the attribution cookie.
 
 ## Out of Scope
 
@@ -316,6 +328,7 @@ These standards apply to every implementation ticket. They reflect the user's re
 - Provider click IDs beyond `gclid` and `fbclid`, except arbitrary `utm_` keys covered by the prefix rule.
 - A "direct/unknown" classification for untagged visits.
 - Production backend, user database, secure JWT issuance/validation, refresh tokens, real server sessions, MFA, login, or password recovery.
+- Server-set, HttpOnly, or cross-subdomain (`Domain`) attribution cookies; these need a backend.
 - Password confirmation, strength feedback, visibility toggle, email verification, password blocklists, breached-password screening, and session expiry.
 - Real bonus redemption, payments, rewards, friend-invite acceptance, game registration, room/event enrollment, or gameplay.
 - Guessing the Registration modal's purpose (newsletter, campaign, event, or another product).
@@ -330,6 +343,7 @@ These standards apply to every implementation ticket. They reflect the user's re
 ### Accepted assumptions to document with the delivered app
 
 - Same user means the same browser profile. The anonymous UUID is not a cross-device identity.
+- Attribution and the UUID live in JavaScript-written first-party cookies; browser privacy policies (notably Safari) can shorten their lifetime below 30 days.
 - Only visits with tracked parameters start the 30-day window; untagged visits record nothing.
 - Registration success returns to the originally requested location and establishes the mock session automatically.
 - The Registration modal is a placeholder; its purpose is an open question for the team (see Registration modal interpretation).
@@ -348,9 +362,11 @@ These standards apply to every implementation ticket. They reflect the user's re
 ### Security and storage references reviewed during discussion
 
 - [Google Conversion Linker](https://support.google.com/tagmanager/answer/7549390?hl=en): established ad-click persistence uses first-party cookies and browser local storage; neither is the only acceptable mechanism.
-- [MDN localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage): browser-scoped persistence with no built-in application expiry.
+- [MDN localStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage): browser-scoped persistence with no built-in expiry; the earlier choice, replaced by cookies to match industry practice.
 - [MDN cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies): request transmission, expiry, cookie scope, and JavaScript versus HttpOnly access.
-- [WebKit tracking prevention](https://webkit.org/tracking-prevention/): browser policies can delete JavaScript-writable storage before the application's requested retention period.
+- [WebKit tracking prevention](https://webkit.org/tracking-prevention/): browser policies can delete JavaScript-writable storage before the application's requested retention period, including the 7-day and 24-hour caps on JavaScript-written cookies.
+- [Chrome cookie lifetime cap](https://developer.chrome.com/blog/cookie-max-age-expires): `Max-Age`/`Expires` beyond 400 days is reduced to 400 days.
+- [Google server-side tagging](https://developers.google.com/tag-platform/tag-manager/server-side): the production direction for first-party, server-set measurement cookies.
 - [Google User-ID](https://support.google.com/analytics/answer/9213390?hl=en): cross-device behavior requires a shared identity, not just independent browser storage.
 - [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html): password policy and TLS transport considerations.
 - [NIST password requirements](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver): protected password transport and salted password hashing requirements.

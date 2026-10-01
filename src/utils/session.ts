@@ -1,30 +1,18 @@
 import type { RegisteredUser } from '../types';
+import { deleteCookie, readCookie, writeCookie } from './cookies';
 
 const SESSION_COOKIE = 'realplay_session';
 
-function browserSessionCookieAttributes() {
-  return `Path=/; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
-}
-
-function readSessionToken() {
-  return document.cookie
-    .split('; ')
-    .find((pair) => pair.startsWith(`${SESSION_COOKIE}=`))
-    ?.slice(SESSION_COOKIE.length + 1);
-}
-
 export function writeSessionCookie(token: string) {
-  document.cookie = `${SESSION_COOKIE}=${token}; ${browserSessionCookieAttributes()}`;
-  const isCookieSaved = readSessionToken() === token;
-  return isCookieSaved;
+  return writeCookie(SESSION_COOKIE, token);
 }
 
 export function deleteSessionCookie() {
-  document.cookie = `${SESSION_COOKIE}=; Max-Age=0; ${browserSessionCookieAttributes()}`;
+  deleteCookie(SESSION_COOKIE);
 }
 
 export function readSessionCookie(): RegisteredUser | null {
-  const token = readSessionToken();
+  const token = readCookie(SESSION_COOKIE);
   const payload = token?.split('.')[1];
   if (!token || token.split('.').length !== 3 || !payload) return null;
   try {

@@ -20,7 +20,6 @@ beforeAll(() => {
 afterEach(() => {
   server.resetHandlers();
   cleanup();
-  localStorage.clear();
   clearCookies();
 });
 

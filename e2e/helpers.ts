@@ -6,6 +6,16 @@ import {
 } from '@playwright/test';
 
 export const SESSION_COOKIE = 'realplay_session';
+export const ATTRIBUTION_COOKIE = 'realplay_attribution';
+export const ANONYMOUS_VISITOR_ID_COOKIE = 'realplay_anonymous_visitor_id';
+
+export async function findCookie(context: BrowserContext, name: string) {
+  return (await context.cookies()).find((cookie) => cookie.name === name);
+}
+
+export function decodeAttributionCookie(value: string | undefined) {
+  return JSON.parse(decodeURIComponent(value ?? '')) as unknown;
+}
 
 export async function submitRegistration(
   page: Page,

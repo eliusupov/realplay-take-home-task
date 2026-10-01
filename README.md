@@ -28,7 +28,7 @@ npm run dev   # http://localhost:5173
 
 ## Behavior
 
-- Attribution: `utm_*`, `ref`, `gclid`, `fbclid`. First touch kept 30 days in localStorage with an anonymous visitor UUID. Cleared on successful registration, kept on logout.
+- Attribution: `utm_*`, `ref`, `gclid`, `fbclid`. First touch kept 30 days in a first-party cookie (`realplay_attribution`), with an anonymous visitor UUID in `realplay_anonymous_visitor_id`; both are renewed on each visit. Safari may cap these script-written cookies at 7 days. Cleared on successful registration, kept on logout.
 - Modals: `welcome=1`, `promo=<code>`, `invite=<friendId>`, `signup=1`. Signed-in only, one at a time in link order; closing removes only its own param.
 - Mock auth: email + password of 8+ chars, cookie session. No login: after logout you can only register again.
 - Open question: The task maps `signup=1` to a Registration modal but shows modals only to authenticated users; its purpose is not specified, so it is a placeholder handled like the other modals. Would confirm with the team.

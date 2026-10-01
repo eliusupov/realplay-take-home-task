@@ -60,20 +60,28 @@ describe('attribution', () => {
   });
 
   it.each([
-    ['invalid JSON', '{not json'],
+    ['invalid JSON', encodeURIComponent('{not json')],
     [
       'untracked params',
-      '{"params":{"promo":"A"},"capturedAt":"2026-01-01T00:00:00.000Z"}',
+      encodeURIComponent(
+        '{"params":{"promo":"A"},"capturedAt":"2026-01-01T00:00:00.000Z"}',
+      ),
     ],
-    ['a bad date', '{"params":{"ref":"x"},"capturedAt":"yesterday"}'],
+    [
+      'a bad date',
+      encodeURIComponent('{"params":{"ref":"x"},"capturedAt":"yesterday"}'),
+    ],
     [
       'a future date',
-      '{"params":{"ref":"x"},"capturedAt":"2026-02-01T00:00:00.000Z"}',
+      encodeURIComponent(
+        '{"params":{"ref":"x"},"capturedAt":"2026-02-01T00:00:00.000Z"}',
+      ),
     ],
+    ['an undecodable value', '%E0%A4%A'],
   ])(
     'ignores a stored record with %s and replaces it on the next capture',
     (_, stored) => {
-      localStorage.setItem('realplay_attribution', stored);
+      document.cookie = `realplay_attribution=${stored}; Path=/`;
 
       expect(snapshotRegistrationAttribution().attribution).toBeNull();
 

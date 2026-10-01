@@ -1,38 +1,35 @@
 import type { Attribution } from '../types';
+import { deleteCookie, readCookie, writeCookie } from './cookies';
 
-const ATTRIBUTION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const ATTRIBUTION_DURATION_MS = 30 * DAY_MS;
+const ANONYMOUS_VISITOR_ID_LIFETIME_MS = 400 * DAY_MS;
 
-const ATTRIBUTION_KEY = 'realplay_attribution';
-const ANONYMOUS_VISITOR_ID_KEY = 'realplay_anonymous_visitor_id';
-const STORAGE_PROBE_KEY = 'realplay_storage_probe';
+const ATTRIBUTION_COOKIE = 'realplay_attribution';
+const ANONYMOUS_VISITOR_ID_COOKIE = 'realplay_anonymous_visitor_id';
+const COOKIE_PROBE = 'realplay_cookie_probe';
 const TRACKED_KEYS = new Set(['ref', 'gclid', 'fbclid']);
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const valuesLostOnReload = new Map<string, string>();
-const memoryStorage = {
-  getItem: (key: string) => valuesLostOnReload.get(key) ?? null,
-  setItem: (key: string, value: string) => {
-    valuesLostOnReload.set(key, value);
-  },
-  removeItem: (key: string) => {
-    valuesLostOnReload.delete(key);
-  },
-};
 
-function openLocalStorageOrMemoryWhenBlocked() {
-  try {
-    localStorage.setItem(STORAGE_PROBE_KEY, '1');
-    localStorage.removeItem(STORAGE_PROBE_KEY);
-    return localStorage;
-  } catch {
-    return memoryStorage;
-  }
+function canSaveCookies() {
+  const isCookieSaved = writeCookie(COOKIE_PROBE, '1');
+  deleteCookie(COOKIE_PROBE);
+  return isCookieSaved;
 }
 
-const storage = openLocalStorageOrMemoryWhenBlocked();
+export const isAttributionPersistent = canSaveCookies();
 
-export const isAttributionPersistent = storage !== memoryStorage;
+function readValue(name: string) {
+  return valuesLostOnReload.get(name) ?? readCookie(name);
+}
+
+function writeValue(name: string, value: string, lifetimeMs: number) {
+  if (writeCookie(name, value, lifetimeMs)) valuesLostOnReload.delete(name);
+  else valuesLostOnReload.set(name, value);
+}
 
 function isTrackedKey(key: string) {
   return key.startsWith('utm_') || TRACKED_KEYS.has(key);
@@ -61,51 +58,69 @@ export function isAttribution(value: unknown): value is Attribution {
   );
 }
 
+function attributionAgeMs(attribution: Attribution) {
+  return Date.now() - Date.parse(attribution.capturedAt);
+}
+
 function readFreshAttribution(): Attribution | null {
-  const stored = storage.getItem(ATTRIBUTION_KEY);
+  const stored = readValue(ATTRIBUTION_COOKIE);
   if (!stored) return null;
   let value: unknown;
   try {
-    value = JSON.parse(stored);
+    value = JSON.parse(decodeURIComponent(stored));
   } catch {
     return null;
   }
   if (!isAttribution(value)) return null;
-  const ageMs = Date.now() - Date.parse(value.capturedAt);
+  const ageMs = attributionAgeMs(value);
   return ageMs >= 0 && ageMs < ATTRIBUTION_DURATION_MS ? value : null;
 }
 
-function ensureAnonymousVisitorId() {
-  const stored = storage.getItem(ANONYMOUS_VISITOR_ID_KEY);
-  if (isAnonymousVisitorId(stored)) return stored;
-  const anonymousVisitorId = crypto.randomUUID();
-  storage.setItem(ANONYMOUS_VISITOR_ID_KEY, anonymousVisitorId);
+function saveAttribution(attribution: Attribution) {
+  writeValue(
+    ATTRIBUTION_COOKIE,
+    encodeURIComponent(JSON.stringify(attribution)),
+    ATTRIBUTION_DURATION_MS - attributionAgeMs(attribution),
+  );
+}
+
+function renewAnonymousVisitorId() {
+  const stored = readValue(ANONYMOUS_VISITOR_ID_COOKIE);
+  const anonymousVisitorId = isAnonymousVisitorId(stored)
+    ? stored
+    : crypto.randomUUID();
+  writeValue(
+    ANONYMOUS_VISITOR_ID_COOKIE,
+    anonymousVisitorId,
+    ANONYMOUS_VISITOR_ID_LIFETIME_MS,
+  );
   return anonymousVisitorId;
 }
 
 export function captureAttribution(search: string) {
-  ensureAnonymousVisitorId();
-  if (readFreshAttribution()) return;
+  renewAnonymousVisitorId();
+  const freshAttribution = readFreshAttribution();
+  if (freshAttribution) {
+    saveAttribution(freshAttribution);
+    return;
+  }
   const params: Record<string, string> = {};
   for (const [key, value] of new URLSearchParams(search)) {
     if (value && isTrackedKey(key) && !Object.hasOwn(params, key))
       params[key] = value;
   }
   if (Object.keys(params).length === 0) return;
-  const attribution: Attribution = {
-    params,
-    capturedAt: new Date().toISOString(),
-  };
-  storage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution));
+  saveAttribution({ params, capturedAt: new Date().toISOString() });
 }
 
 export function snapshotRegistrationAttribution() {
   return {
-    anonymousVisitorId: ensureAnonymousVisitorId(),
+    anonymousVisitorId: renewAnonymousVisitorId(),
     attribution: readFreshAttribution(),
   };
 }
 
 export function clearAttribution() {
-  storage.removeItem(ATTRIBUTION_KEY);
+  deleteCookie(ATTRIBUTION_COOKIE);
+  valuesLostOnReload.delete(ATTRIBUTION_COOKIE);
 }
