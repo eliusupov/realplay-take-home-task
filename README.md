@@ -22,9 +22,36 @@ npm run dev   # http://localhost:5173
 
 ## Try it
 
-- <http://localhost:5173/account?utm_source=google&utm_campaign=spring&gclid=abc&promo=SPRING&welcome=1>: signed out, goes to `/register`, then back with Promo, then Welcome. The `POST /register` payload in DevTools > Network carries the attribution.
-- <http://localhost:5173/?ref=partner42&welcome=1&invite=friend_8f3a2c&promo=SPRING&signup=1>: all four modals in link order.
-- Register with `fail@example.com` to get an HTTP 500, then change the email to retry.
+Start each block signed out, in a private window, or after DevTools > Application > Storage > Clear site data. Watch Application > Cookies and the `POST /register` body in Network. Signed in = registered at `/register` with any email and an 8+ character password.
+
+**Attribution**
+
+1. Capture: <http://localhost:5173/?utm_source=google&utm_campaign=spring&gclid=G1&fbclid=F1&ref=partner42&other=x>. The `realplay_attribution` cookie holds the five tracked params (not `other`) and `capturedAt`; `realplay_anonymous_visitor_id` holds a UUID.
+2. First touch wins within 30 days: then open <http://localhost:5173/?utm_source=instagram>. The cookie is unchanged.
+3. Untagged visits record nothing: clean data, open <http://localhost:5173/>. No attribution cookie. Then step 1 captures normally.
+4. After 30 days, a new campaign replaces it: after step 1, age the record in the DevTools console, then open <http://localhost:5173/?utm_source=newsletter>. The cookie now holds `newsletter` with a new `capturedAt`. Repeat from step 1 with clean data and `days = 29`: it stays `google`.
+
+   ```js
+   const days = 31;
+   const [, v] = document.cookie.match(/realplay_attribution=([^;]+)/);
+   const r = JSON.parse(decodeURIComponent(v));
+   r.capturedAt = new Date(Date.now() - days * 864e5).toISOString();
+   document.cookie = `realplay_attribution=${encodeURIComponent(JSON.stringify(r))}; Path=/`;
+   ```
+
+5. Sent, then cleared: after step 1, open <http://localhost:5173/register> and register. The payload has `attribution` and `anonymousVisitorId`, a toast shows, and the attribution cookie is gone while the UUID stays.
+6. A failure keeps it: after step 1, register with `fail@example.com`. HTTP 500 and an error; the cookie remains. Retry with another email: the payload still carries it.
+7. Logout keeps the UUID: after step 5, log out, open <http://localhost:5173/register> and register again. Same `anonymousVisitorId`, `attribution: null`.
+
+**Redirect and modals**
+
+8. Deep link while signed out: <http://localhost:5173/account?utm_source=google&promo=SPRING&welcome=1#top> goes to `/register`. Register: the payload carries the attribution, you return to `/account?...#top`, and Promo then Welcome open.
+9. Link order, one at a time (signed in): <http://localhost:5173/?welcome=1&invite=friend_8f3a2c&promo=SPRING&signup=1>. Closing each (button, Escape, or backdrop) removes only its own param and shows the next. Reorder the params and the order follows.
+10. Any page: <http://localhost:5173/account?invite=friend_8f3a2c> (signed in).
+11. Refresh and back/forward (signed in): open <http://localhost:5173/?welcome=1> and refresh: it reopens. With it still open, type <http://localhost:5173/account> in the address bar (the modal blocks header clicks), press Back: Welcome reopens; Forward: it closes.
+12. `signup=1`: signed out, <http://localhost:5173/?signup=1> goes to `/register`. Signed in, it shows the Registration placeholder.
+13. Invalid values are ignored: <http://localhost:5173/?welcome=2&promo=> opens nothing, signed in or out, and doesn't redirect to `/register`.
+14. Session: refresh `/account` while signed in and you stay signed in. Log out and you land on a clean `/`.
 
 ## Behavior
 
