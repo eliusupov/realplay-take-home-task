@@ -51,9 +51,7 @@ export function RegisterPage() {
 
   if (user) {
     const returnLocation =
-      readFrom(location.state) ??
-      rememberedLocation ??
-      homeWithOwnQuery(location);
+      linkedLocation ?? rememberedLocation ?? homeWithOwnQuery(location);
     return <Navigate to={returnLocation} replace />;
   }
 

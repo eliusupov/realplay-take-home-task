@@ -181,3 +181,38 @@ test('a direct /register pop-up link also survives a detour', async ({
   await expect(page).toHaveURL('/?welcome=1');
   await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
 });
+
+test('the newest pop-up link wins when several were opened before signing up', async ({
+  page,
+}) => {
+  for (const url of ['/register?promo=A', '/register?promo=B']) {
+    await page.goto(url);
+    await expect(
+      page.getByRole('heading', { name: 'Create an account' }),
+    ).toBeVisible();
+  }
+  await submitRegistration(page, 'ada@example.com', 'correct horse');
+
+  await expect(page).toHaveURL('/?promo=B');
+  await expect(page.getByRole('dialog', { name: 'Promo code' })).toContainText(
+    'B',
+  );
+});
+
+test('leaving an empty email by clicking Register shows its error in one click', async ({
+  page,
+}) => {
+  const requests = trackRegisterRequests(page);
+  await page.goto('/register');
+  await page.getByLabel('Password').fill('correct horse');
+  await page.getByLabel('Email').click();
+
+  await page.getByRole('button', { name: 'Register' }).click();
+
+  await expect(page.getByLabel('Email')).toBeFocused();
+  await expect(page.getByLabel('Email')).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+  expect(requests).toHaveLength(0);
+});

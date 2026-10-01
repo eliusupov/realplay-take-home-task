@@ -59,6 +59,18 @@ describe('RegistrationForm', () => {
     expect(email).not.toHaveAccessibleDescription();
   });
 
+  it('pressing Enter with only the password invalid focuses it and shows its error', async () => {
+    const { user } = renderForm();
+
+    await user.type(screen.getByLabelText(/Email/), 'ada@example.com{Enter}');
+
+    expect(screen.getByLabelText(/Password/)).toHaveFocus();
+    expect(screen.getByLabelText(/Password/)).toHaveAccessibleDescription(
+      'Use at least 8 characters.',
+    );
+    expect(screen.getByLabelText(/Email/)).not.toHaveAccessibleDescription();
+  });
+
   it('disables submit while the request is pending and reports the registered user', async () => {
     const { user, onRegistered } = renderForm();
 

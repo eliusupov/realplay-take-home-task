@@ -25,10 +25,10 @@ export function RegistrationForm({
   const registration = useMutation({ mutationFn: registerUser });
 
   function showErrorFor(field: keyof RegisterRequest) {
-    setErrors({
-      ...errors,
+    setErrors((current) => ({
+      ...current,
       [field]: validateRegistration({ email, password })[field],
-    });
+    }));
   }
 
   function handleSubmit(event: FormEvent) {
@@ -60,13 +60,13 @@ export function RegistrationForm({
         value={email}
         onChange={(event) => {
           setEmail(event.target.value);
-          setErrors({ ...errors, email: undefined });
+          setErrors((current) => ({ ...current, email: undefined }));
         }}
         onBlur={() => {
           showErrorFor('email');
         }}
         error={Boolean(errors.email)}
-        helperText={errors.email}
+        helperText={errors.email ?? ' '}
         inputRef={emailRef}
       />
       <TextField
@@ -78,7 +78,7 @@ export function RegistrationForm({
         value={password}
         onChange={(event) => {
           setPassword(event.target.value);
-          setErrors({ ...errors, password: undefined });
+          setErrors((current) => ({ ...current, password: undefined }));
         }}
         onBlur={() => {
           showErrorFor('password');
