@@ -30,10 +30,6 @@ function isAttribution(value: unknown): value is Attribution {
   );
 }
 
-function attributionAgeMs(attribution: Attribution) {
-  return Date.now() - Date.parse(attribution.capturedAt);
-}
-
 export function readFreshAttribution(): Attribution | null {
   const stored = readCookie(ATTRIBUTION_COOKIE);
   if (!stored) return null;
@@ -44,16 +40,8 @@ export function readFreshAttribution(): Attribution | null {
     return null;
   }
   if (!isAttribution(value)) return null;
-  const ageMs = attributionAgeMs(value);
+  const ageMs = Date.now() - Date.parse(value.capturedAt);
   return ageMs >= 0 && ageMs < ATTRIBUTION_DURATION_MS ? value : null;
-}
-
-function saveAttribution(attribution: Attribution) {
-  writeCookie(
-    ATTRIBUTION_COOKIE,
-    encodeURIComponent(JSON.stringify(attribution)),
-    ATTRIBUTION_DURATION_MS - attributionAgeMs(attribution),
-  );
 }
 
 export function pauseCaptureUntilReload() {
@@ -62,18 +50,22 @@ export function pauseCaptureUntilReload() {
 
 export function captureAttribution(search: string) {
   if (isCapturePausedUntilReload) return;
-  const freshAttribution = readFreshAttribution();
-  if (freshAttribution) {
-    saveAttribution(freshAttribution);
-    return;
-  }
+  if (readFreshAttribution()) return;
   const params: Record<string, string> = {};
   for (const [key, value] of new URLSearchParams(search)) {
     if (value && isTrackedKey(key) && !Object.hasOwn(params, key))
       params[key] = value;
   }
   if (Object.keys(params).length === 0) return;
-  saveAttribution({ params, capturedAt: new Date().toISOString() });
+  const attribution: Attribution = {
+    params,
+    capturedAt: new Date().toISOString(),
+  };
+  writeCookie(
+    ATTRIBUTION_COOKIE,
+    encodeURIComponent(JSON.stringify(attribution)),
+    ATTRIBUTION_DURATION_MS,
+  );
 }
 
 export function clearAttribution() {

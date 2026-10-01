@@ -122,7 +122,7 @@ test('logout keeps pending attribution, and later capture follows first touch', 
   });
 });
 
-test('the attribution cookie is first-party, renewed on each visit, and expired by registration', async ({
+test('the attribution cookie is first-party, written once for 30 days, and expired by registration', async ({
   page,
   context,
 }) => {
@@ -132,7 +132,7 @@ test('the attribution cookie is first-party, renewed on each visit, and expired 
 
   const cookie = await findCookie(context, ATTRIBUTION_COOKIE);
   expect(cookie).toMatchObject({ path: '/', sameSite: 'Lax', httpOnly: false });
-  expect(cookie?.expires).toBeCloseTo(Date.now() / 1000 + 20 * daySeconds, -2);
+  expect(cookie?.expires).toBeCloseTo(Date.now() / 1000 + 30 * daySeconds, -2);
   expect(decodeAttributionCookie(cookie?.value)).toEqual({
     params: { utm_source: 'google' },
     capturedAt: CAMPAIGN_START.toISOString(),

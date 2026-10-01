@@ -34,7 +34,7 @@ A React 18 + TypeScript + Vite app with MUI, React Router (data router), React Q
 - Capture runs in a layout effect in `Layout` while signed out, on every load and query change, before any redirect (`src/utils/attribution.ts`). Unknown URLs render Page not found inside the layout, so a mistyped campaign link still captures.
 - One first-touch record `{ params, capturedAt }` in the first-party cookie `realplay_attribution`: URI-encoded JSON, `Path=/`, `SameSite=Lax`, `Secure` on https, `Max-Age` = time left of the 30 days. Written by JavaScript, so not HttpOnly.
 - Rule: a fresh record (younger than 30 days by `capturedAt`) is kept and new params are ignored. No fresh record (missing, expired or invalid) and a tracked visit: save a new record with `capturedAt = now`. Otherwise store nothing.
-- Renewal: each capture re-writes a fresh record with its remaining lifetime; `capturedAt` never moves. Safari caps script-written cookies at 7 days, so re-writing keeps the record for a visitor who returns within that cap, never past 30 days.
+- Written once at capture with `Max-Age` 30 days; later visits never re-write it, so `capturedAt` and the expiry never move.
 - `capturedAt` decides; the 30-day check runs on every read. Cookie expiry is only cleanup.
 - Registration sends the fresh record or `null`. Success expires the cookie; failure keeps it.
 - After logout, capture pauses until the next full page load: logging out is not a new visit.
