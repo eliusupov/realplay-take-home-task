@@ -12,7 +12,6 @@ import {
 } from '../utils/attribution';
 import { Header } from './Header';
 import { ModalRenderer } from './ModalRenderer';
-import { ModalUrlSync } from './ModalUrlSync';
 
 const SUCCESS_TOAST_DURATION_MS = 6000;
 
@@ -54,7 +53,6 @@ export function Layout() {
           <Outlet />
         </ToastContext.Provider>
       </Container>
-      <ModalUrlSync />
       <ModalRenderer />
       <Snackbar
         open={isToastOpen}

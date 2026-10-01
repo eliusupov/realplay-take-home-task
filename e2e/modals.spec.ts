@@ -101,7 +101,7 @@ test('invalid modal values are ignored and stay in the URL', async ({
   await expect(page.getByRole('dialog')).toBeHidden();
 });
 
-test('signup=1 shows a placeholder when signed in and redirects to registration when signed out', async ({
+test('signup=1 shows the Registration modal when signed in and redirects to registration when signed out', async ({
   page,
   context,
   baseURL,
@@ -114,7 +114,7 @@ test('signup=1 shows a placeholder when signed in and redirects to registration 
   await signInWithSessionCookie(context, baseURL);
   await page.goto('/?signup=1');
   const registration = page.getByRole('dialog', { name: 'Registration' });
-  await expect(registration).toContainText('placeholder');
+  await expect(registration).toContainText('registered and signed in');
   await expect(registration.getByRole('button')).toHaveText(['Close']);
   await expect(registration.getByRole('textbox')).toHaveCount(0);
   expect(requests).toHaveLength(0);

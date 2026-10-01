@@ -5,7 +5,6 @@ import { ModalProvider } from '../../context/ModalProvider';
 import { renderWithProviders } from '../../test/renderWithProviders';
 import type { RegisteredUser } from '../../types';
 import { ModalRenderer } from '../ModalRenderer';
-import { ModalUrlSync } from '../ModalUrlSync';
 
 const ada = { id: 'u1', email: 'ada@example.com' };
 
@@ -18,7 +17,6 @@ function renderModals(url: string, signedInAs?: RegisteredUser) {
         path="/"
         element={
           <ModalProvider>
-            <ModalUrlSync />
             <ModalRenderer />
           </ModalProvider>
         }
@@ -35,22 +33,6 @@ describe('ModalRenderer', () => {
       await screen.findByRole('dialog', { name: 'Promo code' }),
     ).toHaveTextContent('SPRING');
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
-  });
-
-  it('reveals the next modal on close and removes only the closed trigger from the URL', async () => {
-    const { user, router } = renderModals(
-      '/?promo=SPRING&utm_source=mail&welcome=1',
-      ada,
-    );
-
-    await screen.findByRole('dialog', { name: 'Promo code' });
-    await user.click(screen.getByRole('button', { name: 'Close' }));
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Welcome' }),
-    ).toBeInTheDocument();
-    expect(router.state.location.search).toBe('?utm_source=mail&welcome=1');
-    expect(router.state.historyAction).toBe('REPLACE');
   });
 
   it('renders nothing when signed out', () => {

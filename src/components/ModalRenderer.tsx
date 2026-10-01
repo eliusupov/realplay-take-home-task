@@ -51,9 +51,6 @@ export function ModalRenderer() {
           <>
             <DialogContentText>Your link included this code:</DialogContentText>
             <LinkValue>{modal.params.code}</LinkValue>
-            <DialogContentText>
-              This is demo content: no promotion is applied.
-            </DialogContentText>
           </>
         );
       case 'invite':
@@ -61,15 +58,12 @@ export function ModalRenderer() {
           <>
             <DialogContentText>You were invited by:</DialogContentText>
             <LinkValue>{modal.params.friendId}</LinkValue>
-            <DialogContentText>
-              This is demo content: the ID comes from your link.
-            </DialogContentText>
           </>
         );
       case 'registration':
         return (
           <DialogContentText>
-            This is a placeholder. Its content has not been defined yet.
+            You&apos;re registered and signed in.
           </DialogContentText>
         );
     }

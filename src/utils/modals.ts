@@ -7,13 +7,6 @@ export const MODAL_QUERY_KEYS = {
   registration: 'signup',
 } as const satisfies Record<ModalType, string>;
 
-export const MODAL_TYPES: ModalType[] = [
-  'welcome',
-  'promo',
-  'invite',
-  'registration',
-];
-
 function toModal(key: string, value: string): Modal | null {
   switch (key) {
     case MODAL_QUERY_KEYS.welcome:

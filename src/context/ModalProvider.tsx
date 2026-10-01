@@ -1,34 +1,41 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { Modal, ModalType } from '../types';
 import { MODAL_QUERY_KEYS, readModals } from '../utils/modals';
 import { ModalContext } from './ModalContext';
 
+function toQueryValue(modal: Modal) {
+  switch (modal.type) {
+    case 'promo':
+      return modal.params.code;
+    case 'invite':
+      return modal.params.friendId;
+    default:
+      return '1';
+  }
+}
+
 export function ModalProvider({ children }: { children: ReactNode }) {
-  const [modals, setModals] = useState<Modal[]>([]);
   const { pathname, search, hash } = useLocation();
   const navigate = useNavigate();
+  const modals = readModals(search);
 
   function openModal(modal: Modal) {
-    setModals((current) => [
-      ...current.filter(({ type }) => type !== modal.type),
-      modal,
-    ]);
+    const params = new URLSearchParams(search);
+    params.set(MODAL_QUERY_KEYS[modal.type], toQueryValue(modal));
+    const isAlreadyOpen =
+      params.toString() === new URLSearchParams(search).toString();
+    if (isAlreadyOpen) return;
+    void navigate({ pathname, search: params.toString(), hash });
   }
 
-  function removeTriggerFromUrlInSameRender(type: ModalType) {
-    if (!readModals(search).some((modal) => modal.type === type)) return;
+  function closeModal(type: ModalType) {
     const params = new URLSearchParams(search);
     params.delete(MODAL_QUERY_KEYS[type]);
     void navigate(
       { pathname, search: params.toString(), hash },
-      { replace: true, flushSync: true },
+      { replace: true },
     );
-  }
-
-  function closeModal(type: ModalType) {
-    setModals((current) => current.filter((modal) => modal.type !== type));
-    removeTriggerFromUrlInSameRender(type);
   }
 
   return (
