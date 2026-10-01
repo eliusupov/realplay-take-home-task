@@ -236,6 +236,9 @@ test('a record too large for a cookie is kept for the page session, even over a 
   ]);
   const longValue = 'x'.repeat(5000);
   await visitAt(page, CAMPAIGN_START, `/register?utm_content=${longValue}`);
+  await expect(page.getByRole('main')).not.toContainText(
+    'kept only until you reload',
+  );
 
   expect((await findCookie(context, ATTRIBUTION_COOKIE))?.value).toBe(
     rejectedValue,
@@ -280,4 +283,41 @@ test('when cookies are blocked entirely, the app still renders with the notice',
   await expect(page.getByRole('main')).toContainText(
     'kept only until you reload',
   );
+});
+
+test('when cookies cannot be written, registration also clears the page-session attribution', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    "Object.defineProperty(document, 'cookie', { get: () => '', set: () => {} })",
+  );
+  await visitAt(page, CAMPAIGN_START, '/register?utm_source=google');
+  const first = await registerAndReadAttributionFields(page);
+  expect(first.attribution).not.toBeNull();
+
+  await page.getByRole('button', { name: 'Log out' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
+  const second = await registerAndReadAttributionFields(
+    page,
+    'grace@example.com',
+  );
+
+  expect(second.attribution).toBeNull();
+});
+
+test('a campaign link to an unknown page still captures the first touch', async ({
+  page,
+}) => {
+  await visitAt(page, CAMPAIGN_START, '/no-such-page?utm_source=typo');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Page not found' }),
+  ).toBeVisible();
+
+  await page.getByRole('link', { name: 'Go to home' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
+
+  expect((await registerAndReadAttributionFields(page)).attribution).toEqual({
+    params: { utm_source: 'typo' },
+    capturedAt: CAMPAIGN_START.toISOString(),
+  });
 });

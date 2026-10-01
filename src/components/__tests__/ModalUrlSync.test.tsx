@@ -35,6 +35,17 @@ describe('ModalUrlSync', () => {
     ).toHaveTextContent('friend-7');
   });
 
+  it('updates an open modal when its trigger value changes', async () => {
+    const { router } = renderModals('/?promo=SPRING');
+    await screen.findByRole('dialog', { name: 'Promo code' });
+
+    await act(() => router.navigate('/?promo=SUMMER'));
+
+    const promo = screen.getByRole('dialog', { name: 'Promo code' });
+    expect(promo).toHaveTextContent('SUMMER');
+    expect(promo).not.toHaveTextContent('SPRING');
+  });
+
   it('closes a modal when its trigger leaves the URL', async () => {
     const { router } = renderModals('/?welcome=1');
     await screen.findByRole('dialog', { name: 'Welcome' });

@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { ModalProvider } from '../context/ModalProvider';
 import { AccountPage } from '../pages/AccountPage';
 import { HomePage } from '../pages/HomePage';
+import { NotFoundPage } from '../pages/NotFoundPage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { paths } from './paths';
 import { RequireSession } from './RequireSession';
@@ -24,6 +25,7 @@ export const appRoutes = createRoutesFromElements(
       <Route element={<RequireSession />}>
         <Route path={paths.account} element={<AccountPage />} />
       </Route>
+      <Route path="*" element={<NotFoundPage />} />
     </Route>
   </Route>,
 );

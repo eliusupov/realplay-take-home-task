@@ -50,6 +50,7 @@ describe('ModalRenderer', () => {
       await screen.findByRole('dialog', { name: 'Welcome' }),
     ).toBeInTheDocument();
     expect(router.state.location.search).toBe('?utm_source=mail&welcome=1');
+    expect(router.state.historyAction).toBe('REPLACE');
   });
 
   it('renders nothing when signed out', () => {

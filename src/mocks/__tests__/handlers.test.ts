@@ -34,6 +34,18 @@ describe('POST /register', () => {
     });
   });
 
+  it('never echoes the password in the response', async () => {
+    const response = await postRegister({
+      email: 'ada@example.com',
+      password: 'unique-secret-42',
+      anonymousVisitorId: visitorId,
+      attribution: null,
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.text()).not.toContain('unique-secret-42');
+  });
+
   it.each([
     { email: 'ada', password: 'correct horse' },
     { email: 'ada@example.com', password: 'short' },

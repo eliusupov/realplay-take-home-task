@@ -12,8 +12,16 @@ describe('RequireSessionForModals', () => {
         screen.getByRole('heading', { name: 'Create an account' }),
       ).toBeInTheDocument();
       expect(router.state.location.pathname).toBe('/register');
+      expect(router.state.historyAction).toBe('REPLACE');
     },
   );
+
+  it('redirects a signed-out modal link to an unknown page as well', () => {
+    const { router } = renderWithProviders({ url: '/no-such-page?welcome=1' });
+
+    expect(router.state.location.pathname).toBe('/register');
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
 
   it('lets a signed-out visit through when no trigger is valid', () => {
     const { router } = renderWithProviders({

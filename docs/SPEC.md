@@ -115,7 +115,7 @@ These standards apply to every implementation ticket. They reflect the user's re
 - Use a conventional React layout: `components/`, `pages/`, `routes/` (router config and route guards), `context/`, `hooks/`, `api/`, `utils/`, `mocks/`. Create a folder only when it holds real code; no barrel files or speculative layers.
 - Keep dependency direction clear: pages and components use hooks, context, api, and utils; utils import nothing from React layers. Avoid circular imports.
 - Write self-documenting code with no comments. Replace inline conditional JSX (`&&`, ternaries, inline `.map` blocks) with named render functions called from the JSX.
-- The root route has an `ErrorBoundary` as its `errorElement` for unexpected errors and unknown URLs.
+- The root route has an `ErrorBoundary` as its `errorElement` for unexpected errors. Unknown URLs render a Page not found page inside the app layout, so header, attribution capture, and modal handling still apply (a campaign link with a mistyped path keeps its first touch).
 - Use descriptive domain names such as attribution, capturedAt, anonymousVisitorId, returnLocation, and registeredUser. Name booleans as predicates, actions as verbs, and time values with explicit units.
 - Enable strict TypeScript. Model modal variants and API contracts explicitly. Treat parsed cookies, URL values, and request bodies as untrusted until validated; avoid unchecked casts, non-null assertions, and unexplained any types.
 - Keep components, hooks, and functions focused. Separate rendering from attribution/session rules without creating unnecessary service, repository, factory, or adapter layers.

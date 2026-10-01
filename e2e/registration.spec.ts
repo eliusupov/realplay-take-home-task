@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test';
 import {
+  ATTRIBUTION_COOKIE,
+  findCookie,
   isRegisterPost,
   registerAndReadAttributionFields,
+  SESSION_COOKIE,
   submitRegistration,
   trackRegisterRequests,
 } from './helpers';
@@ -83,7 +86,9 @@ test('registration sends a JSON body and returns to the requested page with a to
   ]);
 
   await expect(page).toHaveURL('/account?x=1#h');
-  await expect(page.getByRole('alert')).toContainText('registered');
+  await expect(page.getByRole('alert')).toHaveText(
+    "You're registered and signed in.",
+  );
   await expect(page.getByRole('main')).toContainText('ada@example.com');
   await page.getByRole('link', { name: 'Account (ada@example.com)' }).click();
   await expect(page).toHaveURL('/account');
@@ -101,4 +106,39 @@ test('without a stored origin, registration returns home keeping its own query a
   await expect(page.getByRole('dialog', { name: 'Promo code' })).toContainText(
     'X',
   );
+});
+
+test('automatic redirects replace history, so Back skips /register and the protected URL', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.goto('/account');
+  await expect(page).toHaveURL('/register');
+  await submitRegistration(page, 'ada@example.com', 'correct horse');
+  await expect(page).toHaveURL('/account');
+
+  await page.goBack();
+
+  await expect(page).toHaveURL('/');
+});
+
+test('leaving the page while registration is pending does not sign the visitor in', async ({
+  page,
+  context,
+}) => {
+  const hasCookie = async (name: string) =>
+    Boolean(await findCookie(context, name));
+  await page.goto('/register?utm_source=pending');
+  await expect.poll(() => hasCookie(ATTRIBUTION_COOKIE)).toBe(true);
+  const response = page.waitForResponse((r) => isRegisterPost(r.request()));
+  await submitRegistration(page, 'ada@example.com', 'correct horse');
+  await page.getByRole('link', { name: 'Home' }).click();
+
+  expect((await response).status()).toBe(201);
+  await expect.poll(() => hasCookie(ATTRIBUTION_COOKIE)).toBe(false);
+
+  expect(await hasCookie(SESSION_COOKIE)).toBe(false);
+  await expect(page).toHaveURL('/');
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeHidden();
+  await expect(page.getByRole('alert')).toBeHidden();
 });

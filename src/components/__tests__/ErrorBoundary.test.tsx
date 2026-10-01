@@ -10,18 +10,6 @@ function Broken(): never {
 }
 
 describe('ErrorBoundary', () => {
-  it('shows Page not found with a link home for an unknown route', async () => {
-    renderWithProviders({ url: '/no-such-page' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Page not found' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Go to home' })).toHaveAttribute(
-      'href',
-      '/',
-    );
-  });
-
   it('offers a reload when a page throws', () => {
     silenceExpectedRenderError();
 
