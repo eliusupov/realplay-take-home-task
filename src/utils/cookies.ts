@@ -4,14 +4,10 @@ const cookieAttributes = `Path=/; SameSite=Lax${location.protocol === 'https:' ?
 
 export function readCookie(name: string) {
   const prefix = `${name}=`;
-  try {
-    return document.cookie
-      .split('; ')
-      .find((pair) => pair.startsWith(prefix))
-      ?.slice(prefix.length);
-  } catch {
-    return undefined;
-  }
+  return document.cookie
+    .split('; ')
+    .find((pair) => pair.startsWith(prefix))
+    ?.slice(prefix.length);
 }
 
 export function writeCookie(name: string, value: string, lifetimeMs?: number) {
@@ -19,13 +15,7 @@ export function writeCookie(name: string, value: string, lifetimeMs?: number) {
     lifetimeMs === undefined
       ? ''
       : `Max-Age=${String(Math.ceil(lifetimeMs / SECOND_MS))}; `;
-  try {
-    document.cookie = `${name}=${value}; ${maxAge}${cookieAttributes}`;
-  } catch {
-    return false;
-  }
-  const isCookieSaved = readCookie(name) === value;
-  return isCookieSaved;
+  document.cookie = `${name}=${value}; ${maxAge}${cookieAttributes}`;
 }
 
 export function deleteCookie(name: string) {

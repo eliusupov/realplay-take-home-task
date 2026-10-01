@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { createUnsignedDemoToken } from '../../mocks/handlers';
 import {
   deleteSessionCookie,
   readSessionCookie,
@@ -9,8 +8,8 @@ import {
 const ADA = { id: 'u1', email: 'ada@example.com' };
 
 describe('session cookie', () => {
-  it('reads back the user from a written token and forgets it once deleted', () => {
-    expect(writeSessionCookie(createUnsignedDemoToken(ADA))).toBe(true);
+  it('reads back the written user and forgets it once deleted', () => {
+    writeSessionCookie(ADA);
     expect(readSessionCookie()).toEqual(ADA);
 
     deleteSessionCookie();
@@ -23,15 +22,15 @@ describe('session cookie', () => {
   });
 
   it.each([
-    ['a token without three parts', 'abc.def'],
-    ['a payload that is not base64 JSON', 'e30.%%%.'],
-    ['claims missing the email', `e30.${btoa('{"sub":"u1"}')}.`],
+    ['a value that is not JSON', 'not-json'],
+    ['a user without an email', encodeURIComponent('{"id":"u1"}')],
     [
-      'claims with an empty subject',
-      `e30.${btoa('{"sub":"","email":"ada@example.com"}')}.`,
+      'a user with an empty id',
+      encodeURIComponent('{"id":"","email":"ada@example.com"}'),
     ],
-  ])('rejects %s', (_, token) => {
-    writeSessionCookie(token);
+    ['JSON null', 'null'],
+  ])('rejects %s', (_, value) => {
+    document.cookie = `realplay_session=${value}; Path=/`;
 
     expect(readSessionCookie()).toBeNull();
   });

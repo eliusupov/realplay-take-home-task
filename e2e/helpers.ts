@@ -7,7 +7,6 @@ import {
 
 export const SESSION_COOKIE = 'realplay_session';
 export const ATTRIBUTION_COOKIE = 'realplay_attribution';
-export const ANONYMOUS_VISITOR_ID_COOKIE = 'realplay_anonymous_visitor_id';
 
 export async function findCookie(context: BrowserContext, name: string) {
   return (await context.cookies()).find((cookie) => cookie.name === name);
@@ -42,24 +41,22 @@ export function trackRegisterRequests(page: Page) {
   return requests;
 }
 
-function base64UrlJson(value: object) {
-  return Buffer.from(JSON.stringify(value)).toString('base64url');
-}
-
-export async function signInWithDemoTokenCookie(
+export async function signInWithSessionCookie(
   context: BrowserContext,
   baseURL: string | undefined,
 ) {
-  const token = `${base64UrlJson({ alg: 'none' })}.${base64UrlJson({ sub: 'u1', email: 'ada@example.com' })}.`;
+  const user = { id: 'u1', email: 'ada@example.com' };
   await context.addCookies([
-    { name: SESSION_COOKIE, value: token, url: baseURL },
+    {
+      name: SESSION_COOKIE,
+      value: encodeURIComponent(JSON.stringify(user)),
+      url: baseURL,
+    },
   ]);
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CAMPAIGN_START = new Date('2026-01-01T09:00:00.000Z');
-export const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export function daysAfterStart(days: number) {
   return new Date(CAMPAIGN_START.getTime() + days * DAY_MS);
@@ -71,19 +68,14 @@ export async function visitAt(page: Page, time: Date, url: string) {
   await expect(page.getByRole('main')).toBeVisible();
 }
 
-interface RegistrationBody {
-  anonymousVisitorId: unknown;
-  attribution: unknown;
-}
-
-export async function registerAndReadAttributionFields(
+export async function registerAndReadAttribution(
   page: Page,
   email = 'ada@example.com',
 ) {
   const request = page.waitForRequest(isRegisterPost);
   await submitRegistration(page, email, 'correct horse');
-  const { anonymousVisitorId, attribution } = (
-    await request
-  ).postDataJSON() as RegistrationBody;
-  return { anonymousVisitorId, attribution };
+  const { attribution } = (await request).postDataJSON() as {
+    attribution: unknown;
+  };
+  return attribution;
 }

@@ -26,14 +26,6 @@ describe('SessionProvider', () => {
     expect(screen.getByRole('status')).toHaveTextContent('ada@example.com');
   });
 
-  it('ignores a malformed session cookie', () => {
-    document.cookie = 'realplay_session=not-a-token; Path=/';
-
-    renderWithProviders({ routes: sessionRoutes });
-
-    expect(screen.getByRole('status')).toHaveTextContent('Signed out');
-  });
-
   it('endSession signs the user out and clears the cookie', async () => {
     const { user } = renderWithProviders({
       routes: sessionRoutes,

@@ -10,7 +10,6 @@ import {
   RouterProvider,
 } from 'react-router-dom';
 import { SessionProvider } from '../context/SessionProvider';
-import { createUnsignedDemoToken } from '../mocks/handlers';
 import { appRoutes } from '../routes/appRoutes';
 import { theme } from '../theme';
 import type { RegisteredUser } from '../types';
@@ -27,7 +26,7 @@ export function renderWithProviders({
   routes,
   signedInAs,
 }: RenderOptions = {}) {
-  if (signedInAs) writeSessionCookie(createUnsignedDemoToken(signedInAs));
+  if (signedInAs) writeSessionCookie(signedInAs);
   const router = createMemoryRouter(
     routes ? createRoutesFromElements(routes) : appRoutes,
     { initialEntries: [url] },

@@ -2,18 +2,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderWithProviders } from '../../test/renderWithProviders';
 
-const storageWarning = /not saving site data/;
-
 describe('Layout', () => {
-  it('shows no storage warning when site data is saved', async () => {
-    renderWithProviders();
-
-    expect(
-      await screen.findByRole('heading', { level: 1 }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(storageWarning)).not.toBeInTheDocument();
-  });
-
   it('logs out from a protected page back to a signed-out home', async () => {
     const { user, router } = renderWithProviders({
       url: '/account',

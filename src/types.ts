@@ -29,5 +29,4 @@ export interface RegisterRequest {
 
 export interface RegisterResponse {
   user: RegisteredUser;
-  token: string;
 }

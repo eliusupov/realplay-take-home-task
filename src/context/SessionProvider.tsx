@@ -12,9 +12,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState(readSessionCookie);
 
-  function startSession(nextUser: RegisteredUser, token: string) {
+  function startSession(nextUser: RegisteredUser) {
     setUser(nextUser);
-    return writeSessionCookie(token);
+    writeSessionCookie(nextUser);
   }
 
   function endSession() {

@@ -3,12 +3,11 @@ import Container from '@mui/material/Container';
 import Snackbar from '@mui/material/Snackbar';
 import { useLayoutEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ToastContext, type Toast } from '../context/ToastContext';
+import { ToastContext } from '../context/ToastContext';
 import { useSession } from '../hooks/useSession';
 import { paths } from '../routes/paths';
 import {
   captureAttribution,
-  isAttributionPersistent,
   pauseCaptureUntilReload,
 } from '../utils/attribution';
 import { Header } from './Header';
@@ -21,7 +20,7 @@ export function Layout() {
   const { user, endSession } = useSession();
   const navigate = useNavigate();
   const { search } = useLocation();
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [toastMessage, setToastMessage] = useState('');
   const [isToastOpen, setIsToastOpen] = useState(false);
 
   useLayoutEffect(
@@ -31,8 +30,8 @@ export function Layout() {
     [user, search],
   );
 
-  function showToast(nextToast: Toast) {
-    setToast(nextToast);
+  function showToast(message: string) {
+    setToastMessage(message);
     setIsToastOpen(true);
   }
 
@@ -47,24 +46,10 @@ export function Layout() {
     setIsToastOpen(false);
   }
 
-  const toastAutoHideMs =
-    toast?.severity === 'success' ? SUCCESS_TOAST_DURATION_MS : null;
-
-  const renderStorageWarning = () => {
-    if (isAttributionPersistent) return null;
-    return (
-      <Alert severity="warning" role="status" sx={{ mb: 3 }}>
-        This browser is not saving site data, so campaign details from this
-        visit are kept only until you reload or leave the page.
-      </Alert>
-    );
-  };
-
   return (
     <>
       <Header onLogOut={logOut} />
       <Container component="main" maxWidth="md" sx={{ py: { xs: 4, sm: 6 } }}>
-        {renderStorageWarning()}
         <ToastContext.Provider value={showToast}>
           <Outlet />
         </ToastContext.Provider>
@@ -73,21 +58,21 @@ export function Layout() {
       <ModalRenderer />
       <Snackbar
         open={isToastOpen}
-        autoHideDuration={toastAutoHideMs}
+        autoHideDuration={SUCCESS_TOAST_DURATION_MS}
         onClose={(_event, reason) => {
           if (reason !== 'clickaway') setIsToastOpen(false);
         }}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
-          severity={toast?.severity}
+          severity="success"
           variant="filled"
           onClose={() => {
             setIsToastOpen(false);
           }}
           sx={{ width: '100%' }}
         >
-          {toast?.message}
+          {toastMessage}
         </Alert>
       </Snackbar>
     </>

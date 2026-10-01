@@ -3,7 +3,7 @@ import type { RegisteredUser } from '../types';
 
 interface SessionContextValue {
   user: RegisteredUser | null;
-  startSession: (user: RegisteredUser, token: string) => boolean;
+  startSession: (user: RegisteredUser) => void;
   endSession: () => void;
 }
 

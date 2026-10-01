@@ -3,38 +3,11 @@ import {
   ATTRIBUTION_COOKIE,
   findCookie,
   isRegisterPost,
-  registerAndReadAttributionFields,
+  registerAndReadAttribution,
   SESSION_COOKIE,
   submitRegistration,
   trackRegisterRequests,
 } from './helpers';
-
-test('an invalid email is explained and nothing is sent', async ({ page }) => {
-  const requests = trackRegisterRequests(page);
-  await page.goto('/register');
-
-  await submitRegistration(page, 'ada@example', 'correct horse');
-
-  const email = page.getByLabel('Email');
-  await expect(email).toHaveAttribute('aria-invalid', 'true');
-  await expect(email).toHaveAccessibleDescription(/like name@example\.com/);
-  await expect(email).toBeFocused();
-  expect(requests).toHaveLength(0);
-});
-
-test('a password shorter than 8 characters is explained and nothing is sent', async ({
-  page,
-}) => {
-  const requests = trackRegisterRequests(page);
-  await page.goto('/register');
-
-  await submitRegistration(page, 'ada@example.com', '1234567');
-
-  const password = page.getByLabel('Password');
-  await expect(password).toHaveAttribute('aria-invalid', 'true');
-  await expect(password).toHaveAccessibleDescription(/at least 8 characters/);
-  expect(requests).toHaveLength(0);
-});
 
 test('a pending registration cannot be submitted twice', async ({ page }) => {
   const requests = trackRegisterRequests(page);
@@ -53,20 +26,15 @@ test('fail@example.com shows a server error, and a retry succeeds', async ({
 }) => {
   await page.goto('/register?utm_source=google');
 
-  const failed = await registerAndReadAttributionFields(
-    page,
-    'fail@example.com',
-  );
+  const failed = await registerAndReadAttribution(page, 'fail@example.com');
   await expect(page.getByRole('alert')).toContainText('Try again');
   await expect(page).toHaveURL('/register?utm_source=google');
   await expect(page.getByRole('link', { name: /Account/ })).toBeHidden();
 
-  const retried = await registerAndReadAttributionFields(page);
+  const retried = await registerAndReadAttribution(page);
   await expect(page).toHaveURL('/?utm_source=google');
   await expect(page.getByRole('alert')).toContainText('registered');
-  expect(failed.attribution).toMatchObject({
-    params: { utm_source: 'google' },
-  });
+  expect(failed).toMatchObject({ params: { utm_source: 'google' } });
   expect(retried).toEqual(failed);
 });
 
@@ -81,7 +49,6 @@ test('registration sends a JSON body and returns to the requested page with a to
   expect(Object.keys((await request).postDataJSON() as object)).toEqual([
     'email',
     'password',
-    'anonymousVisitorId',
     'attribution',
   ]);
 

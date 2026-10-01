@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
-  registerAndReadAttributionFields,
-  signInWithDemoTokenCookie,
+  registerAndReadAttribution,
+  signInWithSessionCookie,
   submitRegistration,
   trackRegisterRequests,
 } from './helpers';
@@ -13,9 +13,9 @@ test('a modal link survives registration: attribution is sent, then modals open 
   await expect(page).toHaveURL('/register?utm_source=x&promo=SPRING&welcome=1');
   await expect(page.getByRole('dialog')).toBeHidden();
 
-  const body = await registerAndReadAttributionFields(page);
-
-  expect(body.attribution).toMatchObject({ params: { utm_source: 'x' } });
+  expect(await registerAndReadAttribution(page)).toMatchObject({
+    params: { utm_source: 'x' },
+  });
   await expect(page).toHaveURL(
     '/account?utm_source=x&promo=SPRING&welcome=1#h',
   );
@@ -34,7 +34,7 @@ test('modals follow link order, and closing one removes only its key', async ({
   context,
   baseURL,
 }) => {
-  await signInWithDemoTokenCookie(context, baseURL);
+  await signInWithSessionCookie(context, baseURL);
   await page.goto(
     '/?other=1&welcome=1&utm_medium=m&invite=friend%207&promo=SPRING24#top',
   );
@@ -70,7 +70,7 @@ test('a repeated key opens one modal with its first value, and closing removes e
   context,
   baseURL,
 }) => {
-  await signInWithDemoTokenCookie(context, baseURL);
+  await signInWithSessionCookie(context, baseURL);
   await page.goto('/?promo=FIRSTVAL&welcome=1&promo=SECONDVAL');
 
   const promo = page.getByRole('dialog', { name: 'Promo code' });
@@ -90,7 +90,7 @@ test('invalid modal values are ignored and stay in the URL', async ({
   await page.goto('/?welcome=2&promo=&Welcome=1&invite=');
   await expect(page).toHaveURL('/?welcome=2&promo=&Welcome=1&invite=');
 
-  await signInWithDemoTokenCookie(context, baseURL);
+  await signInWithSessionCookie(context, baseURL);
   await page.goto('/?welcome=2&promo=&signup=1&Welcome=1');
   await expect(
     page.getByRole('dialog', { name: 'Registration' }),
@@ -111,7 +111,7 @@ test('signup=1 shows a placeholder when signed in and redirects to registration 
   await expect(page).toHaveURL('/register?signup=1');
   await expect(page.getByRole('dialog')).toBeHidden();
 
-  await signInWithDemoTokenCookie(context, baseURL);
+  await signInWithSessionCookie(context, baseURL);
   await page.goto('/?signup=1');
   const registration = page.getByRole('dialog', { name: 'Registration' });
   await expect(registration).toContainText('placeholder');
@@ -125,7 +125,7 @@ test('refresh, history and in-app navigation follow the current URL', async ({
   context,
   baseURL,
 }) => {
-  await signInWithDemoTokenCookie(context, baseURL);
+  await signInWithSessionCookie(context, baseURL);
   await page.goto('/?promo=A&welcome=1');
   await page.reload();
   await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
@@ -159,7 +159,7 @@ test('logout closes every modal; the link keeps them pending until signing up ag
   context,
   baseURL,
 }) => {
-  await signInWithDemoTokenCookie(context, baseURL);
+  await signInWithSessionCookie(context, baseURL);
   await page.goto('/account?promo=A&welcome=1');
   await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
 
@@ -183,7 +183,7 @@ test('modals are labelled by their title and keep keyboard focus through the seq
   context,
   baseURL,
 }) => {
-  await signInWithDemoTokenCookie(context, baseURL);
+  await signInWithSessionCookie(context, baseURL);
   await page.goto('/?welcome=1&invite=F7');
 
   const welcome = page.getByRole('dialog', { name: 'Welcome' });

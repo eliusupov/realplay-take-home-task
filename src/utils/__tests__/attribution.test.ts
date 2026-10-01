@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  captureAttribution,
-  clearAttribution,
-  snapshotRegistrationAttribution,
-} from '../attribution';
+import { captureAttribution, readFreshAttribution } from '../attribution';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LANDED_AT = new Date('2026-01-01T00:00:00.000Z');
@@ -23,7 +19,7 @@ describe('attribution', () => {
       '?utm_source=google&promo=A&ref=&gclid=g1&fbclid=f1&utm_source=bing&ref=friend',
     );
 
-    expect(snapshotRegistrationAttribution().attribution).toEqual({
+    expect(readFreshAttribution()).toEqual({
       params: {
         utm_source: 'google',
         gclid: 'g1',
@@ -37,7 +33,7 @@ describe('attribution', () => {
   it('stores nothing when the link has no tracked params', () => {
     captureAttribution('?promo=A&welcome=1');
 
-    expect(snapshotRegistrationAttribution().attribution).toBeNull();
+    expect(readFreshAttribution()).toBeNull();
   });
 
   it('keeps the first touch until 30 days have passed, then expires it and accepts a new one', () => {
@@ -45,15 +41,15 @@ describe('attribution', () => {
 
     vi.setSystemTime(LANDED_AT.getTime() + 30 * DAY_MS - 1);
     captureAttribution('?utm_source=second');
-    expect(snapshotRegistrationAttribution().attribution?.params).toEqual({
+    expect(readFreshAttribution()?.params).toEqual({
       utm_source: 'first',
     });
 
     vi.setSystemTime(LANDED_AT.getTime() + 30 * DAY_MS);
-    expect(snapshotRegistrationAttribution().attribution).toBeNull();
+    expect(readFreshAttribution()).toBeNull();
 
     captureAttribution('?utm_source=third');
-    expect(snapshotRegistrationAttribution().attribution).toEqual({
+    expect(readFreshAttribution()).toEqual({
       params: { utm_source: 'third' },
       capturedAt: '2026-01-31T00:00:00.000Z',
     });
@@ -83,27 +79,12 @@ describe('attribution', () => {
     (_, stored) => {
       document.cookie = `realplay_attribution=${stored}; Path=/`;
 
-      expect(snapshotRegistrationAttribution().attribution).toBeNull();
+      expect(readFreshAttribution()).toBeNull();
 
       captureAttribution('?ref=friend');
-      expect(snapshotRegistrationAttribution().attribution?.params).toEqual({
+      expect(readFreshAttribution()?.params).toEqual({
         ref: 'friend',
       });
     },
   );
-
-  it('gives the visitor a stable UUID that survives clearing the attribution', () => {
-    captureAttribution('?utm_source=google');
-    const { anonymousVisitorId } = snapshotRegistrationAttribution();
-
-    clearAttribution();
-
-    expect(anonymousVisitorId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-    );
-    expect(snapshotRegistrationAttribution()).toEqual({
-      anonymousVisitorId,
-      attribution: null,
-    });
-  });
 });

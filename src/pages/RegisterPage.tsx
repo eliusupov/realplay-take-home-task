@@ -55,20 +55,9 @@ export function RegisterPage() {
     return <Navigate to={returnLocation} replace />;
   }
 
-  function handleRegistered({ user: registeredUser, token }: RegisterResponse) {
-    const isPersisted = startSession(registeredUser, token);
-    if (isPersisted) {
-      showToast({
-        severity: 'success',
-        message: "You're registered and signed in.",
-      });
-      return;
-    }
-    showToast({
-      severity: 'warning',
-      message:
-        "You're registered, but the session cookie couldn't be saved, so reloading will sign you out.",
-    });
+  function handleRegistered({ user: registeredUser }: RegisterResponse) {
+    startSession(registeredUser);
+    showToast("You're registered and signed in.");
   }
 
   return (

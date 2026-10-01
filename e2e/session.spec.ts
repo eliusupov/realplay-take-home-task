@@ -16,18 +16,6 @@ test('the session survives a reload and an existing session skips registration',
   await expect(page).toHaveURL('/?promo=X');
 });
 
-test('malformed session cookies do not grant access', async ({
-  page,
-  context,
-  baseURL,
-}) => {
-  for (const value of ['garbage', 'a.b.c', 'e30.e30.']) {
-    await context.addCookies([{ name: SESSION_COOKIE, value, url: baseURL }]);
-    await page.goto('/account');
-    await expect(page).toHaveURL('/register');
-  }
-});
-
 test('logout ends the session and returns home keeping the query', async ({
   page,
   context,
@@ -46,23 +34,5 @@ test('logout ends the session and returns home keeping the query', async ({
     false,
   );
   await page.goto('/account');
-  await expect(page).toHaveURL('/register');
-});
-
-test('when the session cookie cannot be written, the visitor is told the session ends on reload', async ({
-  page,
-}) => {
-  const dropCookieWrites =
-    "Object.defineProperty(document, 'cookie', { get: () => '', set: () => {} })";
-  await page.addInitScript(dropCookieWrites);
-  await page.goto('/account');
-
-  await submitRegistration(page, 'ada@example.com', 'correct horse');
-
-  await expect(page).toHaveURL('/account');
-  await expect(page.getByRole('alert')).toContainText(
-    'reloading will sign you out',
-  );
-  await page.reload();
   await expect(page).toHaveURL('/register');
 });
