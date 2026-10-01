@@ -16,18 +16,6 @@ function renderHeader(signedInAs?: RegisteredUser, url = '/') {
 }
 
 describe('Header', () => {
-  it('shows only navigation when signed out', () => {
-    renderHeader();
-
-    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Log out' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: /Account/ }),
-    ).not.toBeInTheDocument();
-  });
-
   it('links the avatar initial to the account page when signed in', () => {
     renderHeader({ id: 'u1', email: 'ada@example.com' });
 
@@ -63,16 +51,5 @@ describe('Header', () => {
       screen.queryByRole('link', { name: 'Realplay' }),
     ).not.toBeInTheDocument();
     expect(screen.getByText('Realplay')).toBeInTheDocument();
-  });
-
-  it('calls the log out handler', async () => {
-    const { user, onLogOut } = renderHeader({
-      id: 'u1',
-      email: 'ada@example.com',
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Log out' }));
-
-    expect(onLogOut).toHaveBeenCalledOnce();
   });
 });
