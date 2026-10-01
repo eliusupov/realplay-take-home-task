@@ -45,20 +45,20 @@ Start each block signed out, in a private window, or after DevTools > Applicatio
 
 **Redirect and modals**
 
-8. Deep link while signed out: <http://localhost:5173/account?utm_source=google&promo=SPRING&welcome=1#top> goes to `/register`. Register: the payload carries the attribution, you return to `/account?...#top`, and Promo then Welcome open.
-9. Detour: open the step 8 link, click Home, then Register, and register. You still return to `/account?...` with Promo then Welcome.
+8. Deep link while signed out: <http://localhost:5173/account?utm_source=google&promo=SPRING&welcome=1#top> goes to `/register` with the same query. Register: the payload carries the attribution, you return to `/account?...#top`, and Promo then Welcome open.
+9. Detour: open the step 8 link (Home is hidden while a pop-up is pending), then open <http://localhost:5173/> in the address bar, click Register, and register. You still return to `/account?...` with Promo then Welcome.
 10. Link order, one at a time (signed in): <http://localhost:5173/?welcome=1&invite=friend_8f3a2c&promo=SPRING&signup=1>. Closing each (button, Escape, or backdrop) removes only its own param and shows the next. Reorder the params and the order follows.
 11. Any page: <http://localhost:5173/account?invite=friend_8f3a2c> (signed in).
 12. Refresh and back/forward (signed in): open <http://localhost:5173/?welcome=1> and refresh: it reopens. With it still open, type <http://localhost:5173/account> in the address bar (the modal blocks header clicks), press Back: Welcome reopens; Forward: it closes.
 13. `signup=1`: signed out, <http://localhost:5173/?signup=1> goes to `/register`. Signed in, it shows the Registration placeholder.
 14. Invalid values are ignored: <http://localhost:5173/?welcome=2&promo=> opens nothing, signed in or out, and doesn't redirect to `/register`.
-15. Session: refresh `/account` while signed in and you stay signed in. Log out and you land on a clean `/`.
+15. Session: refresh `/account` while signed in and you stay signed in. Log out and you land on `/` with the same query; campaign params in it are recorded again only after a reload.
 
 ## Behavior
 
 - Attribution: `utm_*`, `ref`, `gclid`, `fbclid`. First touch kept 30 days in a first-party cookie (`realplay_attribution`), with an anonymous visitor UUID in `realplay_anonymous_visitor_id`; both are renewed on each visit. Safari may cap these script-written cookies at 7 days. Cleared on successful registration, kept on logout.
 - Why cookies, not localStorage: first-party cookies are the production standard for attribution (Google `_gcl_aw`, Meta `_fbc`). The server can read and set them, they can span subdomains, and they expire natively; localStorage is JS-only and single-origin. With no backend, JS writes them and the `POST /register` body still carries the values. Server-set HttpOnly cookies (beating Safari's cap) would be a backend-only change.
 - Modals: `welcome=1`, `promo=<code>`, `invite=<friendId>`, `signup=1`. Signed-in only, one at a time in link order; closing removes only its own param. A pop-up link survives leaving `/register`: register later and you still return to it.
-- In-app links keep the URL's query params; logout goes to a clean `/`.
+- Every link, redirect and logout keeps the URL's query params. While signed out with a pop-up pending, the header hides Home. After logout, campaign params left in the URL are recorded again only on a reload.
 - Mock auth: email + password of 8+ chars, cookie session; field errors show when you leave a field. No login: after logout you can only register again.
 - Open question: The task maps `signup=1` to a Registration modal but shows modals only to authenticated users; its purpose is not specified, so it is a placeholder handled like the other modals. Would confirm with the team.

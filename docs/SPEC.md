@@ -20,7 +20,7 @@ On successful registration, establish the mock session in a cookie and React sta
 
 For URL-triggered modals, the order of recognized parameters in the link determines presentation order. Show one modal at a time. Closing it removes only its own parameter and immediately reveals the next remaining eligible modal.
 
-Logout ends the mock session, clears modal and cached user state, and navigates to the clean home URL. It does not clear attribution or the anonymous UUID; successful registration clears the submitted attribution. Demo sessions have no automatic expiry.
+Logout ends the mock session, clears modal and cached user state, and navigates home keeping the query string. It does not clear attribution or the anonymous UUID; successful registration clears the submitted attribution. Demo sessions have no automatic expiry.
 
 ## User Stories
 
@@ -83,7 +83,8 @@ Logout ends the mock session, clears modal and cached user state, and navigates 
 57. As a visitor whose browser refuses cookies, I want attribution kept for the page session with a notice, so that registration still carries it and I know a reload would lose it.
 58. As a reviewer, I want attribution and the UUID visible under the site's cookies in DevTools, so that I can verify capture without reading code.
 59. As a visitor who leaves the registration page before signing up, I want to still return to my original link and see its modals after registering, so that a detour does not lose the link's intent.
-60. As a visitor, I want in-app links and buttons to keep the URL's query parameters, so that navigating around the app does not strip the link I arrived with.
+60. As a visitor, I want every navigation and redirect to keep the URL's query parameters, so that moving around the app never strips the link I arrived with.
+61. As a signed-out visitor with a pop-up link pending, I want no Home button, so that I am not bounced back to registration by a link that cannot take me home.
 
 ## Implementation Decisions
 
@@ -142,18 +143,19 @@ These standards apply to all implementation work. They reflect the user's reques
 
 - A fresh load means an initial browser visit or refresh, rather than only an in-app route transition. In-app navigation means router transitions such as moving between `/` and `/account`.
 - Initialize attribution capture and mock-session restoration before authentication-dependent redirects or modal rendering.
-- An unauthenticated request for a protected page or a valid modal trigger redirects (replace) to `/register`, passing the original location (pathname, search, hash) as router state `from`. Do not redirect when already on `/register`.
+- An unauthenticated request for a protected page or a valid modal trigger redirects (replace) to `/register` keeping the query string, and passes the original location (pathname, search, hash) as router state `from`. Do not redirect when already on `/register`.
 - Router state cannot be set by an external link, so `from` needs no open-redirect validation. It survives a reload of `/register`; opening `/register` fresh has no `from`.
 - Remember the intended location for the tab session in sessionStorage: `from` after a redirect, or `/` with `/register`'s own query and hash when a direct `/register` link carries modal triggers. A plain `/register` visit does not overwrite it. It is per-tab navigation state, so it is not a cookie: it must not leak into other tabs or ride along to the server.
 - Once authenticated on `/register` — after registration success, or on arrival with an existing session — navigate (replace) to `from`, else the remembered location, else `/` with `/register`'s own query and hash (so a direct `/register?promo=X` link keeps its modal intent). Then forget the remembered location.
 - A visitor who leaves `/register` before signing up (for example by clicking Home) and registers later still returns to the original link and sees its modals.
 - The returned location's modal parameters then display, first eligible modal in URL order. `signup` gets no special handling.
 - Preserve attribution in its cookie independently of redirect URL construction.
-- In-app links and buttons (header logo, Home, account avatar, the home page's Register, Page not found's Go to home) keep the current query string exactly as is, every parameter; they drop the hash. Logout is the exception: it goes to a clean `/`, so carried campaign parameters are not captured again as a new visit.
+- The query string is kept, exactly as is, across every in-app navigation and redirect: links and buttons (header logo, Home, account avatar, the home page's Register, Page not found's Go to home), the redirect to `/register`, the return after registering, and logout. Links drop the hash.
+- While signed out with modal triggers in the URL, the header hides Home and shows the logo as plain text: every page would redirect back to `/register`.
 - Use route replacement for automatic auth redirects and for removing a closed modal's URL parameter. Explicit user navigation may add history entries normally.
 - Back/forward must still follow actual browser history: if navigation returns to an entry containing a trigger, that trigger is eligible again.
 - Keep the success notification at the root so the registration-page unmount does not dismiss it.
-- Explicit logout navigates to a clean `/` (no query, no hash).
+- Explicit logout navigates to `/` keeping the query (no hash). Attribution capture then pauses until the next full page load: logging out is not a new visit, while a reload with campaign parameters is, and records them again when no fresh record exists.
 
 ### URL-triggered modals
 
@@ -184,7 +186,7 @@ These standards apply to all implementation work. They reflect the user's reques
 - `closeModal(type)` removes the entry and, if its key is in the URL, deletes only that key with route replacement.
 - Entries keep URL order and the root renderer shows only the first, so there is one Dialog, one backdrop, and one focus trap. Closing it reveals the next. "Stack" is the task's name; presentation is first-in-first-out by link order.
 - Enforce authentication at the root renderer regardless of query parameters. Unauthenticated triggers redirect to `/register` with `from` (see routes); there is no separate unauthenticated queue. The remembered return location (see routes) carries modal intent across detours.
-- Logout clears all entries and navigates to a clean `/`, so nothing reopens.
+- Logout clears all entries and keeps the query. Modal triggers still in the URL send the now signed-out visitor to `/register` and reopen only after signing up again.
 
 ### Registration modal interpretation
 
@@ -286,7 +288,7 @@ These standards apply to all implementation work. They reflect the user's reques
 - Cookie existence alone is not genuine authentication. All protected-route checks here are mock frontend behavior.
 - Header for authenticated users shows the email's first letter in an accessible avatar control and a logout control. Clicking the avatar navigates to `/account`.
 - Account page displays the mock user's email and identity.
-- Logout deletes the session cookie, clears session and modal state and application-owned cached user data, and navigates to a clean `/`. It must not remove attribution or the anonymous UUID. Prevent pending registration completions from restoring a session after logout.
+- Logout deletes the session cookie, clears session and modal state and application-owned cached user data, and navigates to `/` keeping the query. It must not remove attribution or the anonymous UUID. Prevent pending registration completions from restoring a session after logout.
 - There is no login. After logout, the visitor can only register a new mock account; ordinary capture rules apply using the same UUID.
 
 ### Error handling and accessibility
@@ -323,10 +325,10 @@ These standards apply to all implementation work. They reflect the user's reques
 8. `openModal`/`closeModal` are reachable through context, opening leaves the URL unchanged, and no modal renders before authentication regardless of its trigger.
 9. Authenticated `signup=1` shows the placeholder Registration modal and creates no account; an unauthenticated signup link redirects to the registration page like any other trigger.
 10. Session reload restoration and protected-route handling work; malformed cookies do not grant protected access. There is no automatic session expiry.
-11. Logout clears session, cached user, and modal state while preserving any pending attribution and the UUID. Subsequent unauthenticated capture follows the same first-touch rules without resetting a retained timestamp or regenerating the UUID.
+11. Logout clears session, cached user, and modal state while preserving any pending attribution and the UUID. Subsequent unauthenticated capture follows the same first-touch rules without resetting a retained timestamp or regenerating the UUID. Capture pauses after logout until the next full page load.
 12. Corrupt, undecodable, or refused cookies do not crash the app; when the browser refuses cookies, attribution is kept for the page session with a notice; an oversized record falls back silently; keyboard navigation and modal focus/dismissal remain usable.
 13. Attribution and UUID cookies carry `Path=/`, `SameSite=Lax`, and the specified lifetimes; each visit re-writes them without moving `capturedAt`; successful registration expires only the attribution cookie.
-14. A visitor who leaves `/register` (e.g. via Home) and registers later returns to the original link with its modals; the remembered location is then forgotten. In-app links keep the whole query string; logout goes to a clean `/`.
+14. A visitor who leaves `/register` (e.g. via Home) and registers later returns to the original link with its modals; the remembered location is then forgotten. Every navigation and redirect keeps the query string; while signed out with a pop-up pending, the header offers no way home.
 
 ## Out of Scope
 

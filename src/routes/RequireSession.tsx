@@ -6,7 +6,7 @@ export function RedirectToRegister() {
   const { pathname, search, hash } = useLocation();
   return (
     <Navigate
-      to={paths.register}
+      to={{ pathname: paths.register, search }}
       replace
       state={{ from: { pathname, search, hash } }}
     />

@@ -74,7 +74,7 @@ test('registration sends a JSON body and returns to the requested page with a to
   page,
 }) => {
   await page.goto('/account?x=1#h');
-  await expect(page).toHaveURL('/register');
+  await expect(page).toHaveURL('/register?x=1');
 
   const request = page.waitForRequest(isRegisterPost);
   await submitRegistration(page, 'ada@example.com', 'correct horse');
@@ -147,8 +147,12 @@ test('a pop-up link survives leaving /register before signing up, then is forgot
   page,
 }) => {
   await page.goto('/account?utm_source=google&promo=SPRING&welcome=1');
-  await expect(page).toHaveURL('/register');
-  await page.getByRole('link', { name: 'Home' }).click();
+  await expect(page).toHaveURL(
+    '/register?utm_source=google&promo=SPRING&welcome=1',
+  );
+  await expect(page.getByRole('link', { name: 'Home' })).toBeHidden();
+  await expect(page.getByRole('link', { name: 'Realplay' })).toBeHidden();
+  await page.goto('/');
   await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
   await submitRegistration(page, 'ada@example.com', 'correct horse');
 
@@ -163,7 +167,7 @@ test('a pop-up link survives leaving /register before signing up, then is forgot
   await page.getByRole('button', { name: 'Log out' }).click();
   await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
   await submitRegistration(page, 'grace@example.com', 'correct horse');
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/?utm_source=google');
   await expect(page.getByRole('dialog')).toBeHidden();
 });
 

@@ -13,6 +13,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const valuesLostOnReload = new Map<string, string>();
+let isCapturePausedUntilReload = false;
 
 function canSaveCookies() {
   const isCookieSaved = writeCookie(COOKIE_PROBE, '1');
@@ -97,7 +98,12 @@ function renewAnonymousVisitorId() {
   return anonymousVisitorId;
 }
 
+export function pauseCaptureUntilReload() {
+  isCapturePausedUntilReload = true;
+}
+
 export function captureAttribution(search: string) {
+  if (isCapturePausedUntilReload) return;
   renewAnonymousVisitorId();
   const freshAttribution = readFreshAttribution();
   if (freshAttribution) {

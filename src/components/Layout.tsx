@@ -9,6 +9,7 @@ import { paths } from '../routes/paths';
 import {
   captureAttribution,
   isAttributionPersistent,
+  pauseCaptureUntilReload,
 } from '../utils/attribution';
 import { Header } from './Header';
 import { ModalRenderer } from './ModalRenderer';
@@ -36,10 +37,11 @@ export function Layout() {
   }
 
   function leaveProtectedPageBeforeSessionEnds() {
-    void navigate(paths.home, { flushSync: true });
+    void navigate({ pathname: paths.home, search }, { flushSync: true });
   }
 
   function logOut() {
+    pauseCaptureUntilReload();
     leaveProtectedPageBeforeSessionEnds();
     endSession();
     setIsToastOpen(false);

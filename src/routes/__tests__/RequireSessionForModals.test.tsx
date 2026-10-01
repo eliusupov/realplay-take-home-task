@@ -12,6 +12,7 @@ describe('RequireSessionForModals', () => {
         screen.getByRole('heading', { name: 'Create an account' }),
       ).toBeInTheDocument();
       expect(router.state.location.pathname).toBe('/register');
+      expect(router.state.location.search).toBe(search);
       expect(router.state.historyAction).toBe('REPLACE');
     },
   );

@@ -20,7 +20,9 @@ test('a campaign link is captured before the auth redirect and sent with registr
     CAMPAIGN_START,
     '/account?utm_source=a&utm_source=z&utm_medium=&utm_x=b%20c&ref=r&gclid=g%2B1&fbclid=f&welcome=1&promo=p&other=o',
   );
-  await expect(page).toHaveURL('/register');
+  await expect(page).toHaveURL(
+    '/register?utm_source=a&utm_source=z&utm_medium=&utm_x=b%20c&ref=r&gclid=g%2B1&fbclid=f&welcome=1&promo=p&other=o',
+  );
 
   const body = await registerAndReadAttributionFields(page);
 
@@ -92,8 +94,9 @@ test('an untagged first visit does not block a later campaign', async ({
   });
 });
 
-test('registration clears attribution, and logout keeps the anonymous visitor id', async ({
+test('registration clears attribution; after logout the URL campaign is recorded again only on reload, with the same visitor id', async ({
   page,
+  context,
 }) => {
   await visitAt(page, CAMPAIGN_START, '/register?utm_source=google');
   const first = await registerAndReadAttributionFields(page);
@@ -102,14 +105,19 @@ test('registration clears attribution, and logout keeps the anonymous visitor id
 
   await visitAt(page, daysAfterStart(1), '/?utm_source=instagram');
   await page.getByRole('button', { name: 'Log out' }).click();
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/?utm_source=instagram');
+  expect(await findCookie(context, ATTRIBUTION_COOKIE)).toBeUndefined();
 
-  await visitAt(page, daysAfterStart(1), '/register');
+  await page.reload();
+  await page.getByRole('main').getByRole('link', { name: 'Register' }).click();
   const second = await registerAndReadAttributionFields(
     page,
     'grace@example.com',
   );
-  expect(second.attribution).toBeNull();
+  expect(second.attribution).toEqual({
+    params: { utm_source: 'instagram' },
+    capturedAt: daysAfterStart(1).toISOString(),
+  });
   expect(second.anonymousVisitorId).toBe(first.anonymousVisitorId);
 });
 
@@ -256,7 +264,7 @@ test('when cookies cannot be written, attribution works for the page session wit
     "Object.defineProperty(document, 'cookie', { get: () => '', set: () => {} })",
   );
   await visitAt(page, CAMPAIGN_START, '/account?utm_source=google');
-  await expect(page).toHaveURL('/register');
+  await expect(page).toHaveURL('/register?utm_source=google');
   await expect(page.getByRole('main')).toContainText(
     'kept only until you reload',
   );

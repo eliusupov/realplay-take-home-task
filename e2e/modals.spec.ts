@@ -10,7 +10,7 @@ test('a modal link survives registration: attribution is sent, then modals open 
   page,
 }) => {
   await page.goto('/account?utm_source=x&promo=SPRING&welcome=1#h');
-  await expect(page).toHaveURL('/register');
+  await expect(page).toHaveURL('/register?utm_source=x&promo=SPRING&welcome=1');
   await expect(page.getByRole('dialog')).toBeHidden();
 
   const body = await registerAndReadAttributionFields(page);
@@ -108,7 +108,7 @@ test('signup=1 shows a placeholder when signed in and redirects to registration 
 }) => {
   const requests = trackRegisterRequests(page);
   await page.goto('/?signup=1');
-  await expect(page).toHaveURL('/register');
+  await expect(page).toHaveURL('/register?signup=1');
   await expect(page.getByRole('dialog')).toBeHidden();
 
   await signInWithDemoTokenCookie(context, baseURL);
@@ -154,7 +154,7 @@ test('refresh, history and in-app navigation follow the current URL', async ({
   await expect(page.getByRole('dialog')).toBeHidden();
 });
 
-test('logout closes every modal and nothing reopens after registering again', async ({
+test('logout closes every modal; the link keeps them pending until signing up again', async ({
   page,
   context,
   baseURL,
@@ -167,13 +167,15 @@ test('logout closes every modal and nothing reopens after registering again', as
     .getByRole('button', { name: 'Log out', includeHidden: true })
     .dispatchEvent('click');
 
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/register?promo=A&welcome=1');
   await expect(page.getByRole('dialog')).toBeHidden();
-  await page.getByRole('link', { name: 'Register' }).click();
   await submitRegistration(page, 'grace@example.com', 'correct horse');
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/?promo=A&welcome=1');
+  await expect(page.getByRole('dialog', { name: 'Promo code' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Welcome' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('link', { name: /Account/ })).toBeVisible();
-  await expect(page.getByRole('dialog')).toBeHidden();
 });
 
 test('modals are labelled by their title and keep keyboard focus through the sequence', async ({

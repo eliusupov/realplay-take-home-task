@@ -53,6 +53,18 @@ describe('Header', () => {
     }
   });
 
+  it('hides the way home while signed out with a pop-up pending in the URL', () => {
+    renderHeader(undefined, '/?promo=SPRING');
+
+    expect(
+      screen.queryByRole('link', { name: 'Home' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Realplay' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Realplay')).toBeInTheDocument();
+  });
+
   it('calls the log out handler', async () => {
     const { user, onLogOut } = renderHeader({
       id: 'u1',

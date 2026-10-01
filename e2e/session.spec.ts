@@ -28,7 +28,7 @@ test('malformed session cookies do not grant access', async ({
   }
 });
 
-test('logout ends the session and returns to a clean home page', async ({
+test('logout ends the session and returns home keeping the query', async ({
   page,
   context,
 }) => {
@@ -39,7 +39,7 @@ test('logout ends the session and returns to a clean home page', async ({
 
   await page.getByRole('button', { name: 'Log out' }).click();
 
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/?x=1');
   await expect(page.getByRole('alert')).toBeHidden();
   await expect(page.getByRole('link', { name: /Account/ })).toBeHidden();
   expect((await context.cookies()).some((c) => c.name === SESSION_COOKIE)).toBe(
